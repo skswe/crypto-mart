@@ -1,0 +1,35 @@
+from ...enums import InstrumentType, Symbol
+
+instrument_names = {
+    InstrumentType.PERPETUAL: {
+        Symbol.BTC: "BTC-USD-SWAP-LIN",
+        Symbol.FLEX: "FLEX-USD-SWAP-LIN",
+        Symbol.ETH: "ETH-USD-SWAP-LIN",
+        Symbol.BCH: "BCH-USD-SWAP-LIN",
+        Symbol.USDT: "USDT-USD-SWAP-LIN",
+        Symbol.LINK: "LINK-USD-SWAP-LIN",
+        Symbol.YFI: "YFI-USD-SWAP-LIN",
+        Symbol.CRV: "CRV-USD-SWAP-LIN",
+        Symbol.BAND: "BAND-USD-SWAP-LIN",
+        Symbol.SNX: "SNX-USD-SWAP-LIN",
+        Symbol.UNI: "UNI-USD-SWAP-LIN",
+        Symbol.COMP: "COMP-USD-SWAP-LIN",
+        Symbol.BAL: "BAL-USD-SWAP-LIN",
+        Symbol.SUSHI: "SUSHI-USD-SWAP-LIN",
+        Symbol.DOT: "DOT-USD-SWAP-LIN",
+        Symbol.LTC: "LTC-USD-SWAP-LIN",
+        Symbol.OMG: "OMG-USD-SWAP-LIN",
+        Symbol.DASH: "DASH-USD-SWAP-LIN",
+        Symbol.XRP: "XRP-USD-SWAP-LIN",
+        Symbol.RSR: "RSR-USD-SWAP-LIN",
+        Symbol.AAVE: "AAVE-USD-SWAP-LIN",
+        Symbol.REVV: "REVV-USD-SWAP-LIN",
+        Symbol.BNB: "BNB-USD-SWAP-LIN",
+        Symbol.DOGE: "DOGE-USD-SWAP-LIN",
+        Symbol.AXS: "AXS-USD-SWAP-LIN",
+        Symbol.MKR: "MKR-USD-SWAP-LIN",
+        Symbol.SHIB: "SHIB-USD-SWAP-LIN",
+        Symbol.CELR: "CELR-USD-SWAP-LIN",
+        Symbol.LDO: "LDO-USD-SWAP-LIN",
+    }
+}
