@@ -11,11 +11,15 @@ from pandas import DataFrame
 sys.path.append(os.getcwd())
 import unified_dm
 
-N_WORKERS = 5
+N_WORKERS = 10
 ORDER_BOOK_DEPTH = 20
 ORDER_BOOK_SHAPE = (ORDER_BOOK_DEPTH * 2, len(unified_dm.enums.OrderBookSchema))
 SKIP_SYMBOLS = []
 SKIP_EXCHANGES = {unified_dm.Exchange.CME}
+
+# GCP variables
+GCP_PROJECT = os.getenv("GCP_PROJECT", "crypto-arb-341504")
+BQ_DATASET_NAME = os.getenv("BQ_DATASET_NAME", "{exchange}_order_book")
 
 
 def order_book_ping(request):
@@ -32,8 +36,13 @@ def order_book_ping(request):
                 logger.info(
                     f"Order book received: #{id:<4} {exchange.name:<15} {symbol.name:<15} {instType.name} ... Pushing to database"
                 )
+
                 # Push to database
-                pass
+                exchange_name = exchange.name.lower()
+                table_name = f"{BQ_DATASET_NAME.format(exchange=exchange_name)}.{symbol.name}_{instType.name}"
+                order_book.to_gbq(table_name, project_id=GCP_PROJECT, if_exists="append")
+                logger.info(f"Success: #{id:<4} {exchange.name:<15} {symbol.name:<15} {instType.name}")
+
         except Exception as e:
             errors.append((exchange, symbol, instType, e))
 

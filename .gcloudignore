@@ -15,6 +15,7 @@
 
 vbt_backtest
 scripts
+gcloud/util
 tests
 notebooks
 setup.py

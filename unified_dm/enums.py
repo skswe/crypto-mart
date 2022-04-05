@@ -84,8 +84,8 @@ class OrderBookSchema(NameEnum):
 
 
 class OrderBookSide(NameEnum):
-    ask = "ask"
-    bid = "bid"
+    ask = "a"
+    bid = "b"
 
 
 class Exchange(EnumBase):

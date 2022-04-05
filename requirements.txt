@@ -3,3 +3,4 @@ requests==2.22.0
 numpy==1.20.3
 ipython==7.24.1
 plotly==5.1.0
+pandas-gbq==0.17.4
