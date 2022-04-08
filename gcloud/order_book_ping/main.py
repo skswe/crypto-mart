@@ -32,7 +32,7 @@ def order_book_ping(request):
             logger.info(f"Getting order book: #{id:<4} {exchange.name:<15} {symbol.name:<15} {instType.name}")
 
             order_book = dm.exchange_instance_map[exchange].order_book(symbol, instType, depth=ORDER_BOOK_DEPTH)
-            if isinstance(order_book, DataFrame) and order_book.shape == ORDER_BOOK_SHAPE:
+            if isinstance(order_book, DataFrame) and len(order_book.columns) == ORDER_BOOK_SHAPE[1]:
                 logger.info(
                     f"Order book received: #{id:<4} {exchange.name:<15} {symbol.name:<15} {instType.name} ... Pushing to database"
                 )
@@ -42,6 +42,8 @@ def order_book_ping(request):
                 table_name = f"{BQ_DATASET_NAME.format(exchange=exchange_name)}.{symbol.name}_{instType.name}"
                 order_book.to_gbq(table_name, project_id=GCP_PROJECT, if_exists="append")
                 logger.info(f"Success: #{id:<4} {exchange.name:<15} {symbol.name:<15} {instType.name}")
+            else:
+                raise Exception("Invalid orderbook received")
 
         except Exception as e:
             errors.append((exchange, symbol, instType, e))
