@@ -2,6 +2,8 @@ from pyutil.enums import NameEnum
 
 
 class OHLCVColumn(NameEnum):
+    "Column names for OHLCV data feed"
+
     open_time = "open_time"
     open = "open"
     high = "high"
@@ -37,11 +39,15 @@ class OrderBookSchema(NameEnum):
 
 
 class OrderBookSide(NameEnum):
+    """Possible values for OrderBookSchema.side"""
+
     ask = "a"
     bid = "b"
 
 
 class Exchange(NameEnum):
+    """Names of registered exchanges in the API"""
+
     BINANCE = "binance"
     BITMEX = "bitmex"
     BYBIT = "bybit"
@@ -53,6 +59,8 @@ class Exchange(NameEnum):
 
 
 class InstrumentType(NameEnum):
+    """Names of registered instrument types in the API"""
+
     PERPETUAL = "perpetual"
     PERP = "perpetual"
     QUARTERLY = "quarterly"
@@ -60,6 +68,8 @@ class InstrumentType(NameEnum):
 
 
 class Interval(NameEnum):
+    """Names of registered historical candlestick data intervals in the API"""
+
     interval_1m = "interval_1m"
     interval_3m = "interval_3m"
     interval_5m = "interval_5m"
@@ -77,6 +87,8 @@ class Interval(NameEnum):
 
 
 class Symbol(NameEnum):
+    """Names of registered symbols in the API"""
+
     _1000SHIB = "_1000SHIB"
     _1000XEC = "_1000XEC"
     _1INCH = "_1INCH"
