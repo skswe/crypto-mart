@@ -7,7 +7,7 @@ from requests import Request
 
 from ..enums import InstrumentType, Interval, OrderBookSchema, OrderBookSide
 from ..feeds import OHLCVColumn
-from .bases import ExchangeAPIBase
+from .base import ExchangeAPIBase
 from .instrument_names.binance import instrument_names as binance_instrument_names
 
 logger = logging.getLogger(__name__)
@@ -116,3 +116,6 @@ class Binance(ExchangeAPIBase):
 
     def _order_book_quantity_multiplier(self, instType, symbol):
         return 1
+
+
+_exchange_export = Binance

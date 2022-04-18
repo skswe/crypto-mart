@@ -1,7 +1,6 @@
 from .binance import Binance
 from .bitmex import BitMEX
 from .bybit import Bybit
-from .cme import CME
 from .coinflex import CoinFLEX
 from .ftx import FTX
 from .gateio import GateIO

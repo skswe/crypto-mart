@@ -7,7 +7,7 @@ from requests import Request
 
 from ..enums import Interval, OrderBookSchema, OrderBookSide
 from ..feeds import OHLCVColumn
-from .bases import ExchangeAPIBase
+from .base import ExchangeAPIBase
 from .instrument_names.coinflex import instrument_names as coinflex_instrument_names
 
 logger = logging.getLogger(__name__)
@@ -96,3 +96,6 @@ class CoinFLEX(ExchangeAPIBase):
 
     def _order_book_quantity_multiplier(self, instType, symbol):
         return 1
+
+
+_exchange_export = CoinFLEX

@@ -3,12 +3,12 @@ import logging
 import os
 
 import pandas as pd
+from pyutil.cache import cached
 from requests import Request, get
 
 from ..enums import Interval, OrderBookSchema, OrderBookSide
 from ..feeds import OHLCVColumn
-from ..util import cached
-from .bases import ExchangeAPIBase
+from .base import ExchangeAPIBase
 from .instrument_names.gateio import instrument_names as gateio_instrument_names
 
 logger = logging.getLogger(__name__)
@@ -101,12 +101,12 @@ class GateIO(ExchangeAPIBase):
                 }
             )
             .rename(columns={"p": OrderBookSchema.price, "s": OrderBookSchema.quantity})
-            .reindex(columns=OrderBookSchema.names())
+            .reindex(columns=OrderBookSchema._names())
         )
 
         return df
 
-    @cached("cache/order_book_multiplier", is_method=True, instance_identifier="name", log_level="DEBUG")
+    @cached("cache/order_book_multiplier", is_method=True, instance_identifiers=["name"], log_level="DEBUG")
     def _order_book_quantity_multiplier(self, instType, symbol):
         request_url = os.path.join(self._base_url, f"futures/usdt/contracts/{symbol}")
         logger.debug(request_url)
@@ -131,3 +131,6 @@ class GateIO(ExchangeAPIBase):
     @staticmethod
     def seconds_to_ET(seconds):
         return int(seconds)
+
+
+_exchange_export = GateIO

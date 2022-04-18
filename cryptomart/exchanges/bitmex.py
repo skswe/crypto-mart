@@ -9,7 +9,7 @@ from requests import Request
 
 from ..enums import Interval, OrderBookSchema, OrderBookSide
 from ..feeds import OHLCVColumn
-from .bases import ExchangeAPIBase
+from .base import ExchangeAPIBase
 from .instrument_names.bitmex import instrument_names as bitmex_instrument_names
 
 logger = logging.getLogger(__name__)
@@ -132,3 +132,6 @@ class BitMEX(ExchangeAPIBase):
         time_column: str = "open_time",
     ):
         return super()._ohlcv_res_to_dataframe(data, starttime, endtime, timedelta, "close_time")
+
+
+_exchange_export = BitMEX

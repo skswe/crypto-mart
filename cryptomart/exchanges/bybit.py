@@ -3,11 +3,11 @@ import logging
 import os
 
 import pandas as pd
+from cryptomart.feeds import OHLCVColumn
 from requests import Request
-from unified_dm.feeds import OHLCVColumn
 
 from ..enums import Interval, OrderBookSchema, OrderBookSide
-from .bases import ExchangeAPIBase
+from .base import ExchangeAPIBase
 from .instrument_names.bybit import instrument_names as bybit_instrument_names
 
 logger = logging.getLogger(__name__)
@@ -123,3 +123,6 @@ class Bybit(ExchangeAPIBase):
     @staticmethod
     def seconds_to_ET(seconds):
         return int(seconds)
+
+
+_exchange_export = Bybit

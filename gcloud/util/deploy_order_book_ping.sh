@@ -1,1 +1,0 @@
-gcloud functions deploy order_book_ping --runtime python39 --trigger-http --set-build-env-vars GOOGLE_FUNCTION_SOURCE=gcloud/order_book_ping/main.py --timeout=540 --max-instances=1 --memory=512

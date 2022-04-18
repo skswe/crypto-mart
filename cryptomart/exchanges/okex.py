@@ -4,12 +4,12 @@ import os
 
 import numpy as np
 import pandas as pd
+from pyutil.cache import cached
 from requests import Request, get
 
 from ..enums import Interval, OrderBookSchema, OrderBookSide
 from ..feeds import OHLCVColumn
-from ..util import cached
-from .bases import ExchangeAPIBase
+from .base import ExchangeAPIBase
 from .instrument_names.okex import instrument_names as okex_instrument_names
 
 logger = logging.getLogger(__name__)
@@ -109,7 +109,7 @@ class OKEx(ExchangeAPIBase):
         )
         return df
 
-    @cached("cache/order_book_multiplier", is_method=True, instance_identifier="name", log_level="DEBUG")
+    @cached("cache/order_book_multiplier", is_method=True, instance_identifiers=["name"], log_level="DEBUG")
     def _order_book_quantity_multiplier(self, instType, symbol):
         if instType == "PERPETUAL":
             _instType = "SWAP"
@@ -123,3 +123,6 @@ class OKEx(ExchangeAPIBase):
         res = get(request_url, params).json()
         multiplier = int(res["data"][0]["ctVal"])
         return multiplier
+
+
+_exchange_export = OKEx
