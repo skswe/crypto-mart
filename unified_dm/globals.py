@@ -9,4 +9,4 @@ END_OHLCV_DATE = datetime.datetime(2022, 3, 11)
 INVALID_DATE = datetime.datetime(1980, 1, 1)
 CACHE_PATH = "cache"
 
-BLACKLISTED_SYMBOLS = [Symbol.DEFI, Symbol.PRIV,  Symbol.ALT, Symbol.EXCH, Symbol.SHIT, Symbol.MID]
+BLACKLISTED_SYMBOLS = []
