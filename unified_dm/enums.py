@@ -35,6 +35,7 @@ class OHLCVColumn(NameEnum):
     close = "close"
     volume = "volume"
     returns = "returns"
+    funding_rate = "funding_rate"
 
 
 class SpreadColumn(NameEnum):
@@ -86,6 +87,15 @@ class OrderBookSchema(NameEnum):
 class OrderBookSide(NameEnum):
     ask = "a"
     bid = "b"
+
+class FundingRateSchema(NameEnum):
+    "Column Schema for Funding rate structure"
+
+    timestamp = "timestamp"
+    """Timestamp of Funding Rate"""
+    
+    funding_rate = "fundingRate"
+    """Value of Funding Rate """
 
 
 class Exchange(EnumBase):

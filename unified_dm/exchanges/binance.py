@@ -1,11 +1,12 @@
 import datetime
 import logging
 import os
+import re
 
 import pandas as pd
 from requests import Request
 
-from ..enums import InstrumentType, Interval, OrderBookSchema, OrderBookSide
+from ..enums import InstrumentType, Interval, OrderBookSchema, OrderBookSide, FundingRateSchema
 from ..feeds import OHLCVColumn
 from .bases import ExchangeAPIBase
 from .instrument_names.binance import instrument_names as binance_instrument_names
@@ -50,6 +51,10 @@ class Binance(ExchangeAPIBase):
         3: OHLCVColumn.low,
         4: OHLCVColumn.close,
         5: OHLCVColumn.volume,
+    }
+    _funding_rate_column_map = {
+        "fundingtime": FundingRateSchema.timestamp,
+        "fundingRate": FundingRateSchema.funding_rate 
     }
 
     def _ohlcv_prepare_request(self, instType, symbol, interval, starttime, endtime, limit):
@@ -115,4 +120,27 @@ class Binance(ExchangeAPIBase):
         )
 
     def _order_book_quantity_multiplier(self, instType, symbol):
-        return 1
+        return 1    
+    
+    def _histrorical_funding_rate_prepare_request(self, instType, symbol, starttime, endtime, limit):
+        request_url = os.path.join(self._base_url,"fundingRate")
+        return Request(
+                "GET",
+                request_url,
+                params= {
+                "symbol": symbol,
+                "startTime": starttime,
+                "endTime": endtime,
+                "limit":limit,
+                },
+        )
+    
+    def _histrorical_funding_rate_extract_response(self, response):
+        if isinstance(response, dict) and "code" in response:
+            # Error has occured
+
+            # Raise general exception for now
+            # TODO: build exception handling where reponse error can be fixed
+            raise Exception(response["msg"])
+        return response
+        
