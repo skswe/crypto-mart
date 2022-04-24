@@ -23,6 +23,7 @@ def exchange(client, request):
 @pytest.mark.parametrize("symbol", [Symbol.BTC, Symbol.ETH, Symbol.ADA, Symbol.DOGE])
 @pytest.mark.parametrize("interval", [Interval.interval_1d])
 @pytest.mark.parametrize(["starttime", "endtime"], [(datetime(2021, 10, 1), datetime(2021, 12, 3))])
+@pytest.mark.requires_http
 def test_ohlcv(exchange: ExchangeAPIBase, instType, symbol, interval, starttime, endtime):
     try:
         exchange.ohlcv(instType, symbol, interval, starttime, endtime, disable_cache=True)
@@ -33,6 +34,7 @@ def test_ohlcv(exchange: ExchangeAPIBase, instType, symbol, interval, starttime,
 @pytest.mark.parametrize("instType", [InstrumentType.PERPETUAL])
 @pytest.mark.parametrize("symbol", [Symbol.BTC, Symbol.ETH])
 @pytest.mark.parametrize("depth", [20])
+@pytest.mark.requires_http
 def test_orderbook(exchange: ExchangeAPIBase, instType, symbol, depth):
     orderbook = exchange.order_book(symbol, instType, depth)
     assert (orderbook.columns == OrderBookSchema._names()).all()
