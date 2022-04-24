@@ -11,6 +11,6 @@ setuptools.setup(
         "requests", 
         "pandas", 
         "numpy",
-        "pyutil @ git+ssh://git@github.com/ssender/pyutil.git"
+        "pyutil @ git+ssh://git@github.com/senderr/pyutil.git"
     ],
 )
