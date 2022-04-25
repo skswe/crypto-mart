@@ -58,7 +58,9 @@ class Client:
             self._exchange_class_map[exchange] = exchange_module._exchange_export
 
         def _init_exchange_thread(exchange_name: str, exchange_cls: ExchangeAPIBase, exchange_kwargs: dict):
-            setattr(self, exchange_name, exchange_cls(**exchange_kwargs))
+            inst = exchange_cls(**exchange_kwargs)
+            setattr(self, exchange_name, inst)
+            self._exchange_instance_map[exchange_name] = inst
 
         # Map each instantiation to its own thread to minimuze http request blocking
         with ThreadPoolExecutor(max_workers=len(self._active_exchanges)) as executor:
