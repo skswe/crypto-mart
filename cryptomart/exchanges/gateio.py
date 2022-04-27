@@ -9,7 +9,8 @@ from requests import Request, get
 from ..enums import Interval, OrderBookSchema, OrderBookSide
 from ..feeds import OHLCVColumn
 from .base import ExchangeAPIBase
-from .instrument_names.gateio import instrument_names as gateio_instrument_names
+from .instrument_names.gateio import \
+    instrument_names as gateio_instrument_names
 
 logger = logging.getLogger(__name__)
 
@@ -107,7 +108,7 @@ class GateIO(ExchangeAPIBase):
         return df
 
     @cached("cache/order_book_multiplier", is_method=True, instance_identifiers=["name"], log_level="DEBUG")
-    def _order_book_quantity_multiplier(self, instType, symbol):
+    def _order_book_quantity_multiplier(self, instType, symbol, **kwargs):
         request_url = os.path.join(self._base_url, f"futures/usdt/contracts/{symbol}")
         logger.debug(request_url)
         res = get(request_url).json()

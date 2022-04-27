@@ -101,7 +101,7 @@ class Kucoin(ExchangeAPIBase):
         return df
 
     @cached("cache/order_book_multiplier", is_method=True, instance_identifiers=["name"], log_level="DEBUG")
-    def _order_book_quantity_multiplier(self, instType, symbol):
+    def _order_book_quantity_multiplier(self, instType, symbol, **kwargs):
         request_url = os.path.join(self._base_url, f"contracts/{symbol}")
         res = get(request_url).json()
         return float(res["data"]["multiplier"])

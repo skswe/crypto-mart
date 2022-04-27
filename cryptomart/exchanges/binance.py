@@ -114,7 +114,7 @@ class Binance(ExchangeAPIBase):
             **{OrderBookSchema.timestamp: self.ET_to_datetime(response["T"]).replace(microsecond=0)}
         )
 
-    def _order_book_quantity_multiplier(self, instType, symbol):
+    def _order_book_quantity_multiplier(self, instType, symbol, **kwargs):
         return 1
 
 

@@ -102,7 +102,7 @@ class Bybit(ExchangeAPIBase):
         )
         return df
 
-    def _order_book_quantity_multiplier(self, instType, symbol):
+    def _order_book_quantity_multiplier(self, instType, symbol, **kwargs):
         return 1
 
     @staticmethod

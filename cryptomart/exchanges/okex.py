@@ -110,7 +110,7 @@ class OKEx(ExchangeAPIBase):
         return df
 
     @cached("cache/order_book_multiplier", is_method=True, instance_identifiers=["name"], log_level="DEBUG")
-    def _order_book_quantity_multiplier(self, instType, symbol):
+    def _order_book_quantity_multiplier(self, instType, symbol, **kwargs):
         if instType == "PERPETUAL":
             _instType = "SWAP"
         else:

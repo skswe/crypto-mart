@@ -109,7 +109,7 @@ class AbstractExchangeAPIBase(ABC):
         pass
 
     @abstractmethod
-    def _order_book_quantity_multiplier(self, instType, symbol) -> float:
+    def _order_book_quantity_multiplier(self, instType, symbol, **kwargs) -> float:
         """Multiplier to bring order book size equal to size in underlying crypto asset"""
         pass
 
@@ -220,6 +220,7 @@ class ExchangeAPIBase(AbstractExchangeAPIBase):
         symbol: Symbol,
         instType: InstrumentType = InstrumentType.PERPETUAL,
         depth: int = 20,
+        log_level = "DEBUG",
     ):
         """Return order book snapshot for given instrument"""
         symbol_name = self.get_instrument(instType, symbol)[Instrument.contract_name]
@@ -234,7 +235,7 @@ class ExchangeAPIBase(AbstractExchangeAPIBase):
 
         res = res.astype({OrderBookSchema.price: float, OrderBookSchema.quantity: float})
         res[OrderBookSchema.quantity] = res[OrderBookSchema.quantity] * self._order_book_quantity_multiplier(
-            instType, symbol_name
+            instType, symbol_name, log_level=log_level
         )
         bids = (
             res[res[OrderBookSchema.side] == OrderBookSide.bid]
