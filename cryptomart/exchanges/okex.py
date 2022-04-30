@@ -111,7 +111,7 @@ class OKEx(ExchangeAPIBase):
 
     @cached("cache/order_book_multiplier", is_method=True, instance_identifiers=["name"], log_level="DEBUG")
     def _order_book_quantity_multiplier(self, instType, symbol, **kwargs):
-        if instType == "PERPETUAL":
+        if instType == "perpetual":
             _instType = "SWAP"
         else:
             _instType = "FUTURES"
