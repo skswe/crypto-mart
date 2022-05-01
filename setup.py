@@ -7,10 +7,5 @@ setuptools.setup(
     author_email="stefano.katsoras@gmail.com",
     license="MIT",
     packages=setuptools.find_packages(),
-    install_requires=[
-        "requests", 
-        "pandas", 
-        "numpy",
-        "pyutil @ git+ssh://git@github.com/senderr/pyutil.git"
-    ],
+    install_requires=["requests", "pandas", "numpy", "pyutil @ git+ssh://git@github.com/senderr/pyutil.git"],
 )
