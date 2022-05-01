@@ -99,7 +99,7 @@ class OHLCVFeed(OHLCVBase):
         self.orig_endtime = endtime
 
         if isinstance(data, pd.DataFrame):
-            # Create returns column as ((Spread level 1/ Spread level 0) - 1) * 100
+            # Returns = the % gain on close from one bar to the next
             metric_column = data[OHLCVColumn.close]
             data[OHLCVColumn.returns] = ((metric_column - metric_column.shift(1)) / metric_column.shift(1)) * 100
 
