@@ -7,6 +7,7 @@ from concurrent.futures import ThreadPoolExecutor
 from typing import List
 
 from .enums import Exchange
+from .exchanges import FTX, Binance, BitMEX, Bybit, CoinFLEX, GateIO, Kucoin, OKEx
 from .exchanges.base import ExchangeAPIBase
 from .globals import LOGGING_FORMATTER
 
@@ -51,6 +52,38 @@ class Client:
         self._exchange_class_map = {}
         self._load_exchanges(debug=debug, **exchange_init_kwargs)
 
+    @property
+    def binance(self) -> Binance:
+        return self._exchange_instance_map[Exchange.BINANCE]
+
+    @property
+    def bitmex(self) -> BitMEX:
+        return self._exchange_instance_map[Exchange.BITMEX]
+
+    @property
+    def bybit(self) -> Bybit:
+        return self._exchange_instance_map[Exchange.BYBIT]
+
+    @property
+    def coinflex(self) -> CoinFLEX:
+        return self._exchange_instance_map[Exchange.COINFLEX]
+
+    @property
+    def ftx(self) -> FTX:
+        return self._exchange_instance_map[Exchange.FTX]
+
+    @property
+    def okex(self) -> OKEx:
+        return self._exchange_instance_map[Exchange.OKEX]
+
+    @property
+    def gateio(self) -> GateIO:
+        return self._exchange_instance_map[Exchange.GATEIO]
+
+    @property
+    def kucoin(self) -> Kucoin:
+        return self._exchange_instance_map[Exchange.KUCOIN]
+
     def _load_exchanges(self, **kwargs):
         # Import exchange classes
         for exchange in self._active_exchanges:
@@ -58,9 +91,7 @@ class Client:
             self._exchange_class_map[exchange] = exchange_module._exchange_export
 
         def _init_exchange_thread(exchange_name: str, exchange_cls: ExchangeAPIBase, exchange_kwargs: dict):
-            inst = exchange_cls(**exchange_kwargs)
-            setattr(self, exchange_name, inst)
-            self._exchange_instance_map[exchange_name] = inst
+            self._exchange_instance_map[exchange_name] = exchange_cls(**exchange_kwargs)
 
         # Map each instantiation to its own thread to minimuze http request blocking
         with ThreadPoolExecutor(max_workers=len(self._active_exchanges)) as executor:
