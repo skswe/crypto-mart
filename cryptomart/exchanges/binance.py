@@ -52,7 +52,7 @@ class Binance(ExchangeAPIBase):
         5: OHLCVColumn.volume,
     }
 
-    def _ohlcv_prepare_request(self, instType, symbol, interval, starttime, endtime, limit):
+    def _ohlcv_prepare_request(self, symbol, instType, interval, starttime, endtime, limit):
         if instType == InstrumentType.PERPETUAL:
             url = "klines"
             params = {
@@ -85,7 +85,7 @@ class Binance(ExchangeAPIBase):
             raise Exception(response["msg"])
         return response
 
-    def _order_book_prepare_request(self, instType, symbol, depth=50):
+    def _order_book_prepare_request(self, symbol, instType, depth=50):
         request_url = os.path.join(self._base_url, "depth")
 
         return Request(
@@ -114,7 +114,7 @@ class Binance(ExchangeAPIBase):
             **{OrderBookSchema.timestamp: self.ET_to_datetime(response["T"]).replace(microsecond=0)}
         )
 
-    def _order_book_quantity_multiplier(self, instType, symbol, **kwargs):
+    def _order_book_quantity_multiplier(self, symbol, instType, **kwargs):
         return 1
 
 

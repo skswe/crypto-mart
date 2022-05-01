@@ -89,7 +89,7 @@ class AbstractExchangeAPIBase(ABC):
         pass
 
     @abstractmethod
-    def _ohlcv_prepare_request(self, instType, symbol, interval, starttime, endtime, limit) -> Request:
+    def _ohlcv_prepare_request(self, symbol, instType, interval, starttime, endtime, limit) -> Request:
         """Function to set up API http request"""
         pass
 
@@ -99,7 +99,7 @@ class AbstractExchangeAPIBase(ABC):
         pass
 
     @abstractmethod
-    def _order_book_prepare_request(self, instType, symbol, depth=50) -> Request:
+    def _order_book_prepare_request(self, symbol, instType, depth=50) -> Request:
         """Function to set up API http request"""
         pass
 
@@ -109,7 +109,7 @@ class AbstractExchangeAPIBase(ABC):
         pass
 
     @abstractmethod
-    def _order_book_quantity_multiplier(self, instType, symbol, **kwargs) -> float:
+    def _order_book_quantity_multiplier(self, symbol, instType, **kwargs) -> float:
         """Multiplier to bring order book size equal to size in underlying crypto asset"""
         pass
 
@@ -140,8 +140,8 @@ class ExchangeAPIBase(AbstractExchangeAPIBase):
 
         self.all_instruments = pd.DataFrame(stack_dict(self.instrument_names)).rename(
             columns={
-                0: Instrument.instType,
-                1: Instrument.symbol,
+                0: Instrument.symbol,
+                1: Instrument.instType,
                 2: Instrument.contract_name,
             },
         )
@@ -152,7 +152,7 @@ class ExchangeAPIBase(AbstractExchangeAPIBase):
         # Load active instruments as the set of instruments that have a valid listing date
         # Defined as function so result can be cached
         @cached(
-            "cache/instruments",
+            "/tmp/cache/instruments",
             identifiers=[self.name],
             disabled=not use_instruments_cache,
             refresh=refresh_instruments_cache,
@@ -161,8 +161,8 @@ class ExchangeAPIBase(AbstractExchangeAPIBase):
             logger.debug(f"Active instruments before getting listings: \n {self.active_instruments.head(20)}")
             self.active_instruments[Instrument.listing_date] = self.active_instruments.apply(
                 lambda r: self._ohlcv_get_instrument_listing(
-                    r.instType,
                     r.symbol,
+                    r.instType,
                     cache_kwargs={"disabled": not use_instruments_cache, "refresh": refresh_instruments_cache},
                 ),
                 axis=1,
@@ -195,22 +195,22 @@ class ExchangeAPIBase(AbstractExchangeAPIBase):
             self.active_instruments[self.active_instruments[Instrument.instType] == instType][Instrument.symbol]
         )
 
-    def get_instrument(self, instType, symbol) -> pd.Series:
+    def get_instrument(self, symbol, instType) -> pd.Series:
         """Returns active instrument for instType and symbol, raises error if the instrument does not exist"""
         try:
             return self.active_instruments[
-                (self.active_instruments[Instrument.instType] == instType)
-                & (self.active_instruments[Instrument.symbol] == symbol)
+                (self.active_instruments[Instrument.symbol] == symbol)
+                & (self.active_instruments[Instrument.instType] == instType)
             ].iloc[0]
         except IndexError:
             raise NotSupportedError(
-                f"The given combination {instType}, {symbol} is not a valid instrument for {self.name}. Valid options are: \n\n{self.active_instruments}"
+                f"The given combination {symbol}, {instType} is not a valid instrument for {self.name}. Valid options are: \n\n{self.active_instruments}"
             ) from None
 
-    def has_instrument(self, instType, symbol):
+    def has_instrument(self, symbol, instType):
         """Returns true if the instrument exists in self.active_instruments"""
         try:
-            self.get_instrument(instType, symbol)
+            self.get_instrument(symbol, instType)
             return True
         except IndexError:
             return False
@@ -220,22 +220,22 @@ class ExchangeAPIBase(AbstractExchangeAPIBase):
         symbol: Symbol,
         instType: InstrumentType = InstrumentType.PERPETUAL,
         depth: int = 20,
-        log_level = "DEBUG",
+        log_level="DEBUG",
     ):
         """Return order book snapshot for given instrument"""
-        symbol_name = self.get_instrument(instType, symbol)[Instrument.contract_name]
+        symbol_name = self.get_instrument(symbol, instType)[Instrument.contract_name]
         if depth is not None:
             order_book_kwargs = {"depth": depth}
         else:
             order_book_kwargs = {}
 
-        request: requests.Request = self._order_book_prepare_request(instType, symbol_name, **order_book_kwargs)
+        request: requests.Request = self._order_book_prepare_request(symbol_name, instType, **order_book_kwargs)
         res = self.dispatcher.send_request(request)
         res = self._order_book_extract_response(res)
 
         res = res.astype({OrderBookSchema.price: float, OrderBookSchema.quantity: float})
         res[OrderBookSchema.quantity] = res[OrderBookSchema.quantity] * self._order_book_quantity_multiplier(
-            instType, symbol_name, log_level=log_level
+            symbol_name, instType, log_level=log_level
         )
         bids = (
             res[res[OrderBookSchema.side] == OrderBookSide.bid]
@@ -252,8 +252,8 @@ class ExchangeAPIBase(AbstractExchangeAPIBase):
 
     def ohlcv(
         self,
-        instType: InstrumentType,
         symbol: Symbol,
+        instType: InstrumentType = InstrumentType.PERPETUAL,
         interval: Interval = Interval.interval_1d,
         starttime: Union[datetime.datetime, Tuple[int]] = None,  # starttime is the open time of the very first bar
         endtime: Union[
@@ -265,8 +265,8 @@ class ExchangeAPIBase(AbstractExchangeAPIBase):
         """Query Exchange for OHLCV bars
 
         Args:
-            instType (InstrumentType): Instrument Type
             symbol (Symbol): Symbol
+            instType (InstrumentType, optional): Instrument Type. Defaults to InstrumentType.PERPETUAL.
             interval (Interval, optional): Bar interval. Defaults to Interval.interval_1d.
             starttime (Union[datetime.datetime, Tuple], optional): Start time. Defaults to listing time.
             endtime (Union[datetime.datetime, Tuple], optional): End time. Defaults to now.
@@ -276,25 +276,25 @@ class ExchangeAPIBase(AbstractExchangeAPIBase):
         Returns:
             (OHLCVFeed): OHLCV Feed object with columns: [open_time, open, high, low, close, volume]
         """
-        instType, symbol, interval, starttime, endtime = self._ohlcv_validate(
-            instType, symbol, interval, starttime, endtime
+        symbol, instType, interval, starttime, endtime = self._ohlcv_validate(
+            symbol, instType, interval, starttime, endtime
         )
         logger.info("-" * 80)
         logger.info(f"Performing OHLCV for {self.name}: ")
-        logger.info(f"instType: {instType}")
         logger.info(f"symbol: {symbol}")
+        logger.info(f"instType: {instType}")
         logger.info(f"starttime: {starttime}")
         logger.info(f"endtime: {endtime}")
         logger.info("-" * 80)
 
         # Get actual symbol and interval
 
-        symbol_name = self.get_instrument(instType, symbol)[Instrument.contract_name]
+        symbol_name = self.get_instrument(symbol, instType)[Instrument.contract_name]
         interval_name, timedelta = self.intervals[interval]  # tuple of (request param, datetime.timedelta)
 
         df = self._ohlcv(
-            instType,
             symbol_name,
+            instType,
             interval_name,
             starttime,
             endtime,
@@ -308,13 +308,13 @@ class ExchangeAPIBase(AbstractExchangeAPIBase):
             logger.info(f"The DataFrame has {missing_rows} missing row(s)")
         logger.info("Done OHLCV Request")
 
-        return OHLCVFeed(df, self.name, instType, symbol, interval, starttime, endtime)
+        return OHLCVFeed(df, self.name, symbol, instType, interval, starttime, endtime)
 
-    @cached("cache/ohlcv", is_method=True, instance_identifiers=["name"])
+    @cached("/tmp/cache/ohlcv", is_method=True, instance_identifiers=["name"])
     def _ohlcv(
         self,
-        instType: InstrumentType,
         symbol: str,
+        instType: InstrumentType,
         interval: Union[str, int],
         starttime: datetime.datetime,
         endtime: datetime.datetime,
@@ -329,7 +329,7 @@ class ExchangeAPIBase(AbstractExchangeAPIBase):
         start_times, end_times, limits = self._ohlcv_get_request_intervals(starttime, endtime, timedelta, limit)
 
         for _starttime, _endtime, limit in zip(start_times, end_times, limits):
-            request = self._ohlcv_prepare_request(instType, symbol, interval, _starttime, _endtime, limit)
+            request = self._ohlcv_prepare_request(symbol, instType, interval, _starttime, _endtime, limit)
             _requests.append(request)
 
         expected_datapoints = sum(limits)
@@ -357,8 +357,8 @@ class ExchangeAPIBase(AbstractExchangeAPIBase):
 
     def _ohlcv_validate(
         self,
-        instType: InstrumentType,
         symbol: Symbol,
+        instType: InstrumentType,
         interval: Interval,
         starttime: datetime.datetime,  # starttime is the open time of the very first bar
         endtime: datetime.datetime,  # endtime is the time that occurs immediately after the final close time:
@@ -372,11 +372,11 @@ class ExchangeAPIBase(AbstractExchangeAPIBase):
             starttime = datetime.datetime(*starttime)
         if isinstance(endtime, tuple):
             endtime = datetime.datetime(*endtime)
-        starttime = self._ohlcv_get_default_starttime(starttime, instType, symbol)
+        starttime = self._ohlcv_get_default_starttime(starttime, symbol, instType)
         endtime = endtime or END_OHLCV_DATE
         try:
             assert instType in self.instrument_types, invalid_instType_msg
-            assert self.has_instrument(instType, symbol), invalid_symbol_msg
+            assert self.has_instrument(symbol, instType), invalid_symbol_msg
             assert interval in self.intervals, invalid_interval_msg
         except AssertionError as e:
             raise NotSupportedError(e) from None
@@ -384,13 +384,13 @@ class ExchangeAPIBase(AbstractExchangeAPIBase):
         assert isinstance(starttime, datetime.datetime), f"starttime must be a datetime"
         assert isinstance(endtime, datetime.datetime), f"endtime must be a datetime"
         assert endtime > starttime, "Invalid endtime"
-        return instType, symbol, interval, starttime, endtime
+        return symbol, instType, interval, starttime, endtime
 
-    @cached("cache/listing", is_method=True, instance_identifiers=["name"])
+    @cached("/tmp/cache/listing", is_method=True, instance_identifiers=["name"])
     def _ohlcv_get_instrument_listing(
         self,
-        instType: InstrumentType,
         symbol: Symbol,
+        instType: InstrumentType,
         cache_kwargs={},
     ):
         """Return listing for a given instrument"""
@@ -399,12 +399,12 @@ class ExchangeAPIBase(AbstractExchangeAPIBase):
         interval = Interval.interval_1d
         starttime = EARLIEST_OHLCV_DATE
         endtime = datetime.datetime.now()
-        symbol_name = self.get_instrument(instType, symbol)[Instrument.contract_name]
+        symbol_name = self.get_instrument(symbol, instType)[Instrument.contract_name]
         interval_name, timedelta = self.intervals[interval]
 
         df = self._ohlcv(
-            instType,
             symbol_name,
+            instType,
             interval_name,
             starttime,
             endtime,
@@ -535,11 +535,11 @@ class ExchangeAPIBase(AbstractExchangeAPIBase):
         """Returns instruments that do not have a listing date"""
         return self.active_instruments.merge(self.all_instruments, how="right").pipe(
             lambda df: df[df[Instrument.listing_date].isna()]
-        )[[Instrument.instType, Instrument.symbol, Instrument.contract_name]]
+        )[[Instrument.symbol, Instrument.instType, Instrument.contract_name]]
 
-    def _ohlcv_get_default_starttime(self, starttime, instType, symbol):
+    def _ohlcv_get_default_starttime(self, starttime, symbol, instType):
         """Returns listing date for given instrument if starttime is none"""
-        listing_date = self.get_instrument(instType, symbol)[Instrument.listing_date].to_pydatetime()
+        listing_date = self.get_instrument(symbol, instType)[Instrument.listing_date].to_pydatetime()
         if starttime is None:
             logger.info("starttime is None, defaulting to instrument listing time")
             return listing_date

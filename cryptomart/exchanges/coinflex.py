@@ -49,7 +49,7 @@ class CoinFLEX(ExchangeAPIBase):
         "volume24h": OHLCVColumn.volume,
     }
 
-    def _ohlcv_prepare_request(self, instType, symbol, interval, starttime, endtime, limit):
+    def _ohlcv_prepare_request(self, symbol, instType, interval, starttime, endtime, limit):
         url = f"v2/candles/{symbol}"
         params = {
             "timeframe": interval,
@@ -71,7 +71,7 @@ class CoinFLEX(ExchangeAPIBase):
             raise Exception(response["message"])
         return response["data"]
 
-    def _order_book_prepare_request(self, instType, symbol, depth=50):
+    def _order_book_prepare_request(self, symbol, instType, depth=50):
         request_url = os.path.join(self._base_url, f"v2/depth/{symbol}/{depth}")
 
         return Request("GET", request_url)
@@ -94,7 +94,7 @@ class CoinFLEX(ExchangeAPIBase):
             **{OrderBookSchema.timestamp: self.ET_to_datetime(response["timestamp"]).replace(microsecond=0)}
         )
 
-    def _order_book_quantity_multiplier(self, instType, symbol, **kwargs):
+    def _order_book_quantity_multiplier(self, symbol, instType, **kwargs):
         return 1
 
 

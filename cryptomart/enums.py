@@ -16,8 +16,8 @@ class OHLCVColumn(NameEnum):
 class Instrument(NameEnum):
     """Column names for Exchange active_instruments"""
 
-    instType = "instType"
     symbol = "symbol"
+    instType = "instType"
     contract_name = "contract_name"
     listing_date = "listing_date"
 

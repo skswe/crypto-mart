@@ -9,8 +9,7 @@ from requests import Request, get
 from ..enums import Interval, OrderBookSchema, OrderBookSide
 from ..feeds import OHLCVColumn
 from .base import ExchangeAPIBase
-from .instrument_names.gateio import \
-    instrument_names as gateio_instrument_names
+from .instrument_names.gateio import instrument_names as gateio_instrument_names
 
 logger = logging.getLogger(__name__)
 
@@ -49,7 +48,7 @@ class GateIO(ExchangeAPIBase):
         "v": OHLCVColumn.volume,
     }
 
-    def _ohlcv_prepare_request(self, instType, symbol, interval, starttime, endtime, limit):
+    def _ohlcv_prepare_request(self, symbol, instType, interval, starttime, endtime, limit):
         url = "futures/usdt/candlesticks"
         params = {
             "contract": symbol,
@@ -70,7 +69,7 @@ class GateIO(ExchangeAPIBase):
 
         return response[:-1]
 
-    def _order_book_prepare_request(self, instType, symbol, depth=50):
+    def _order_book_prepare_request(self, symbol, instType, depth=50):
         request_url = os.path.join(self._base_url, "futures/usdt/order_book")
 
         return Request(
@@ -107,8 +106,8 @@ class GateIO(ExchangeAPIBase):
 
         return df
 
-    @cached("cache/order_book_multiplier", is_method=True, instance_identifiers=["name"], log_level="DEBUG")
-    def _order_book_quantity_multiplier(self, instType, symbol, **kwargs):
+    @cached("/tmp/cache/order_book_multiplier", is_method=True, instance_identifiers=["name"], log_level="DEBUG")
+    def _order_book_quantity_multiplier(self, symbol, instType, **kwargs):
         request_url = os.path.join(self._base_url, f"futures/usdt/contracts/{symbol}")
         logger.debug(request_url)
         res = get(request_url).json()

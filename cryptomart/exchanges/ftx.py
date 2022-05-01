@@ -45,7 +45,7 @@ class FTX(ExchangeAPIBase):
         "volume": OHLCVColumn.volume,
     }
 
-    def _ohlcv_prepare_request(self, instType, symbol, interval, starttime, endtime, limit):
+    def _ohlcv_prepare_request(self, symbol, instType, interval, starttime, endtime, limit):
         url = f"markets/{symbol}/candles"
         params = {
             "resolution": interval,
@@ -65,7 +65,7 @@ class FTX(ExchangeAPIBase):
 
         return response["result"]
 
-    def _order_book_prepare_request(self, instType, symbol, depth=50):
+    def _order_book_prepare_request(self, symbol, instType, depth=50):
         request_url = os.path.join(self._base_url, f"markets/{symbol}/orderbook")
 
         return Request(
@@ -95,7 +95,7 @@ class FTX(ExchangeAPIBase):
             **{OrderBookSchema.timestamp: datetime.datetime.utcnow().replace(microsecond=0)}
         )
 
-    def _order_book_quantity_multiplier(self, instType, symbol, **kwargs):
+    def _order_book_quantity_multiplier(self, symbol, instType, **kwargs):
         return 1
 
     @staticmethod

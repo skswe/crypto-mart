@@ -50,7 +50,7 @@ class Kucoin(ExchangeAPIBase):
         5: OHLCVColumn.volume,
     }
 
-    def _ohlcv_prepare_request(self, instType, symbol, interval, starttime, endtime, limit):
+    def _ohlcv_prepare_request(self, symbol, instType, interval, starttime, endtime, limit):
         url = "kline/query"
         params = {
             "symbol": symbol,
@@ -70,7 +70,7 @@ class Kucoin(ExchangeAPIBase):
             raise Exception(response["msg"])
         return response["data"]
 
-    def _order_book_prepare_request(self, instType, symbol, depth):
+    def _order_book_prepare_request(self, symbol, instType, depth):
         request_url = os.path.join(self._base_url, "level2/depth100")
 
         return Request(
@@ -100,8 +100,8 @@ class Kucoin(ExchangeAPIBase):
         )
         return df
 
-    @cached("cache/order_book_multiplier", is_method=True, instance_identifiers=["name"], log_level="DEBUG")
-    def _order_book_quantity_multiplier(self, instType, symbol, **kwargs):
+    @cached("/tmp/cache/order_book_multiplier", is_method=True, instance_identifiers=["name"], log_level="DEBUG")
+    def _order_book_quantity_multiplier(self, symbol, instType, **kwargs):
         request_url = os.path.join(self._base_url, f"contracts/{symbol}")
         res = get(request_url).json()
         return float(res["data"]["multiplier"])

@@ -24,9 +24,9 @@ def exchange(client, request):
 @pytest.mark.parametrize("interval", [Interval.interval_1d])
 @pytest.mark.parametrize(["starttime", "endtime"], [(datetime(2021, 10, 1), datetime(2021, 12, 3))])
 @pytest.mark.requires_http
-def test_ohlcv(exchange: ExchangeAPIBase, instType, symbol, interval, starttime, endtime):
+def test_ohlcv(exchange: ExchangeAPIBase, symbol, instType, interval, starttime, endtime):
     try:
-        exchange.ohlcv(instType, symbol, interval, starttime, endtime, disable_cache=True)
+        exchange.ohlcv(symbol, instType, interval, starttime, endtime, disable_cache=True)
     except NotSupportedError as e:
         pytest.skip(str(e))
 
@@ -35,7 +35,7 @@ def test_ohlcv(exchange: ExchangeAPIBase, instType, symbol, interval, starttime,
 @pytest.mark.parametrize("symbol", [Symbol.BTC, Symbol.ETH])
 @pytest.mark.parametrize("depth", [20])
 @pytest.mark.requires_http
-def test_orderbook(exchange: ExchangeAPIBase, instType, symbol, depth):
+def test_orderbook(exchange: ExchangeAPIBase, symbol, instType, depth):
     orderbook = exchange.order_book(symbol, instType, depth)
     assert (orderbook.columns == OrderBookSchema._names()).all()
 

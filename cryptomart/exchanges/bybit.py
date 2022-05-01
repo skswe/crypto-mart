@@ -52,7 +52,7 @@ class Bybit(ExchangeAPIBase):
         "volume": OHLCVColumn.volume,
     }
 
-    def _ohlcv_prepare_request(self, instType, symbol, interval, starttime, endtime, limit):
+    def _ohlcv_prepare_request(self, symbol, instType, interval, starttime, endtime, limit):
         url = "public/linear/kline"
         params = {
             "symbol": symbol,
@@ -72,7 +72,7 @@ class Bybit(ExchangeAPIBase):
             raise Exception(response["ret_msg"])
         return response["result"]
 
-    def _order_book_prepare_request(self, instType, symbol, depth):
+    def _order_book_prepare_request(self, symbol, instType, depth):
         request_url = os.path.join(self._base_url, "v2/public/orderBook/L2")
 
         return Request(
@@ -102,7 +102,7 @@ class Bybit(ExchangeAPIBase):
         )
         return df
 
-    def _order_book_quantity_multiplier(self, instType, symbol, **kwargs):
+    def _order_book_quantity_multiplier(self, symbol, instType, **kwargs):
         return 1
 
     @staticmethod
