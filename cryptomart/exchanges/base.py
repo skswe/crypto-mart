@@ -1,6 +1,7 @@
 import datetime
 import logging
 import math
+import os
 from abc import ABC, abstractmethod
 from typing import Dict, List, Tuple, Union
 
@@ -128,6 +129,7 @@ class ExchangeAPIBase(AbstractExchangeAPIBase):
         debug: bool = False,
         use_instruments_cache: bool = True,
         refresh_instruments_cache: bool = False,
+        cache_path: str = "/tmp/cache",
     ):
         self._missing_data_threshold = missing_data_threshold
         rate_limit_delay = 1 / self._max_requests_per_second
@@ -137,6 +139,8 @@ class ExchangeAPIBase(AbstractExchangeAPIBase):
             self.log_level = logging.DEBUG
         else:
             self.log_level = logging.INFO
+
+        self.cache_path = cache_path
 
         self.all_instruments = pd.DataFrame(stack_dict(self.instrument_names)).rename(
             columns={
@@ -152,7 +156,7 @@ class ExchangeAPIBase(AbstractExchangeAPIBase):
         # Load active instruments as the set of instruments that have a valid listing date
         # Defined as function so result can be cached
         @cached(
-            "/tmp/cache/instruments",
+            os.path.join(self.cache_path, "instruments"),
             identifiers=[self.name],
             disabled=not use_instruments_cache,
             refresh=refresh_instruments_cache,
@@ -163,7 +167,11 @@ class ExchangeAPIBase(AbstractExchangeAPIBase):
                 lambda r: self._ohlcv_get_instrument_listing(
                     r.symbol,
                     r.instType,
-                    cache_kwargs={"disabled": not use_instruments_cache, "refresh": refresh_instruments_cache},
+                    cache_kwargs={
+                        "disabled": not use_instruments_cache,
+                        "refresh": refresh_instruments_cache,
+                        "path": os.path.join(self.cache_path, "listing"),
+                    },
                 ),
                 axis=1,
             )
@@ -235,7 +243,10 @@ class ExchangeAPIBase(AbstractExchangeAPIBase):
 
         res = res.astype({OrderBookSchema.price: float, OrderBookSchema.quantity: float})
         res[OrderBookSchema.quantity] = res[OrderBookSchema.quantity] * self._order_book_quantity_multiplier(
-            symbol_name, instType, log_level=log_level
+            symbol_name,
+            instType,
+            log_level=log_level,
+            cache_kwargs={"path": os.path.join(self.cache_path, "order_book_multiplier")},
         )
         bids = (
             res[res[OrderBookSchema.side] == OrderBookSide.bid]
@@ -300,7 +311,11 @@ class ExchangeAPIBase(AbstractExchangeAPIBase):
             endtime,
             timedelta,
             strict=True,
-            cache_kwargs={"disabled": disable_cache, "refresh": refresh_cache},
+            cache_kwargs={
+                "disabled": disable_cache,
+                "refresh": refresh_cache,
+                "path": os.path.join(self.cache_path, "ohlcv"),
+            },
         )
 
         missing_rows = df.iloc[:, 1].isna().sum()
