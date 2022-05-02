@@ -103,7 +103,8 @@ class Client:
             )
 
         for error in errors:
-            logger.error(f"Error returned while initializing exchange: {error}")
+            if error:
+                logger.error(f"Error returned while initializing exchange: {error}")
 
     @property
     def log_level(self):
