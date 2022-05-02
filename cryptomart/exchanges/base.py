@@ -144,8 +144,8 @@ class ExchangeAPIBase(AbstractExchangeAPIBase):
 
         self.all_instruments = pd.DataFrame(stack_dict(self.instrument_names)).rename(
             columns={
-                0: Instrument.symbol,
-                1: Instrument.instType,
+                0: Instrument.instType,
+                1: Instrument.symbol,
                 2: Instrument.contract_name,
             },
         )

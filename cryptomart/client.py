@@ -95,12 +95,15 @@ class Client:
 
         # Map each instantiation to its own thread to minimuze http request blocking
         with ThreadPoolExecutor(max_workers=len(self._active_exchanges)) as executor:
-            executor.map(
+            errors = executor.map(
                 _init_exchange_thread,
                 self._exchange_class_map.keys(),
                 self._exchange_class_map.values(),
                 [kwargs] * len(self._exchange_class_map),
             )
+
+        for error in errors:
+            logger.error(f"Error returned while initializing exchange: {error}")
 
     @property
     def log_level(self):
