@@ -245,8 +245,7 @@ class ExchangeAPIBase(AbstractExchangeAPIBase):
         res[OrderBookSchema.quantity] = res[OrderBookSchema.quantity] * self._order_book_quantity_multiplier(
             symbol_name,
             instType,
-            log_level=log_level,
-            cache_kwargs={"path": os.path.join(self.cache_path, "order_book_multiplier")},
+            cache_kwargs={"path": os.path.join(self.cache_path, "order_book_multiplier"), "log_level": log_level},
         )
         bids = (
             res[res[OrderBookSchema.side] == OrderBookSide.bid]
