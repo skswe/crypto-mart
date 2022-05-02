@@ -6,6 +6,8 @@ import os
 from concurrent.futures import ThreadPoolExecutor
 from typing import List
 
+import pyutil
+
 from .enums import Exchange
 from .exchanges import FTX, Binance, BitMEX, Bybit, CoinFLEX, GateIO, Kucoin, OKEx
 from .exchanges.base import ExchangeAPIBase
@@ -35,6 +37,8 @@ class Client:
         """
         if debug:
             self.log_level = logging.DEBUG
+            pyutil.root_logger.setLevel(logging.DEBUG)
+
         if log_file is not None:
             if os.path.exists(log_file):
                 logger.info(f"Removing old log file: {log_file}")
@@ -113,6 +117,7 @@ class Client:
     @log_level.setter
     def log_level(self, level):
         logging.getLogger("cryptomart").setLevel(level)
+        logging.getLogger("pyutil").setLevel(level)
 
     @property
     def exchanges(self):
