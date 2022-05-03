@@ -2,6 +2,7 @@ import datetime
 import logging
 import os
 import re
+from wsgiref.util import request_uri
 
 import pandas as pd
 from requests import Request
@@ -53,7 +54,7 @@ class Binance(ExchangeAPIBase):
         5: OHLCVColumn.volume,
     }
     _funding_rate_column_map = {
-        "fundingtime": FundingRateSchema.timestamp,
+        "fundingTime": FundingRateSchema.timestamp,
         "fundingRate": FundingRateSchema.funding_rate 
     }
 
@@ -122,25 +123,34 @@ class Binance(ExchangeAPIBase):
     def _order_book_quantity_multiplier(self, instType, symbol):
         return 1    
     
-    def _histrorical_funding_rate_prepare_request(self, instType, symbol, starttime, endtime, limit):
-        request_url = os.path.join(self._base_url,"fundingRate")
-        return Request(
-                "GET",
-                request_url,
-                params= {
+    
+    def _histrorical_funding_rate_prepare_request(self,instType,symbol,starttime,endtime,limit):
+        #request_url = os.path.join(self._base_url,"/fundingRate")
+        request_url = "https://fapi.binance.com/fapi/v1/fundingRate"
+        params={
                 "symbol": symbol,
-                "startTime": starttime,
-                "endTime": endtime,
-                "limit":limit,
-                },
+                "limit": limit,
+            },
+        
+        return Request(
+            "GET",
+            request_url,
+            params=params,    
         )
     
     def _histrorical_funding_rate_extract_response(self, response):
-        if isinstance(response, dict) and "code" in response:
+        if isinstance(response, list) and "code" in response:
             # Error has occured
 
             # Raise general exception for now
             # TODO: build exception handling where reponse error can be fixed
             raise Exception(response["msg"])
-        return response
-        
+        return response  
+    
+    @staticmethod
+    def ET_to_datetime(et):
+        # Convert exchange native time format to datetime
+        if isinstance(et, str):
+            return datetime.datetime.fromisoformat(et).replace(tzinfo=None)
+        else:
+            return datetime.datetime.utcfromtimestamp(et)

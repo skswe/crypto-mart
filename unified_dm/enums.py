@@ -90,11 +90,12 @@ class OrderBookSide(NameEnum):
 
 class FundingRateSchema(NameEnum):
     "Column Schema for Funding rate structure"
-
+    symbol = "symbol"
+    
     timestamp = "timestamp"
     """Timestamp of Funding Rate"""
     
-    funding_rate = "fundingRate"
+    funding_rate = "funding_rate"
     """Value of Funding Rate """
 
 

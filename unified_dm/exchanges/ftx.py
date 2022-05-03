@@ -6,7 +6,7 @@ import pandas as pd
 from requests import Request
 from unified_dm.feeds import OHLCVColumn
 
-from ..enums import Interval, OrderBookSchema, OrderBookSide
+from ..enums import Interval, OrderBookSchema, OrderBookSide,FundingRateSchema
 from .bases import ExchangeAPIBase
 from .instrument_names.ftx import instrument_names as ftx_instrument_names
 
@@ -43,6 +43,10 @@ class FTX(ExchangeAPIBase):
         "low": OHLCVColumn.low,
         "close": OHLCVColumn.close,
         "volume": OHLCVColumn.volume,
+    }
+    _funding_rate_column_map = {
+        "time": FundingRateSchema.timestamp,
+        "rate": FundingRateSchema.funding_rate 
     }
 
     def _ohlcv_prepare_request(self, instType, symbol, interval, starttime, endtime, limit):
@@ -97,6 +101,28 @@ class FTX(ExchangeAPIBase):
 
     def _order_book_quantity_multiplier(self, instType, symbol):
         return 1
+    
+    def _histrorical_funding_rate_prepare_request(self, instType, symbol, starttime, endtime, limit):
+        request_url = os.path.join(self._base_url,"funding_rates")
+        
+        return Request(
+                "GET",
+                request_url,
+                params= {
+                "future": symbol,
+                "startTime": datetime_to_ET(starttime),
+                "endTime": datetime_to_ET(endtime),
+                },
+        )
+    
+    def _histrorical_funding_rate_extract_response(self, response):
+        if response["success"] != True:
+            # Error has occured
+
+            # Raise general exception for now
+            # TODO: build exception handling where reponse error can be fixed
+            raise Exception(response["error"])
+        return response["result"]
 
     @staticmethod
     def ET_to_datetime(et):

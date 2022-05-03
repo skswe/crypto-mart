@@ -1,6 +1,7 @@
 import datetime
 import logging
 import math
+from sqlite3 import Row
 import time
 from abc import ABC, abstractmethod
 from typing import Callable, Dict, List, Tuple, Union
@@ -174,9 +175,9 @@ class AbstractExchangeAPIBase(AbstractExchangeBase):
         """Function to extract data from API http response"""  
         pass        
     
-    @abstractmethod
-    def historical_funding_rate(self, symbol: Symbol, starttime: datetime.datetime, endtime: datetime.datetime, instType: InstrumentType):
-        """Return Funding Rate for given instrument"""
+    #@abstractmethod
+    #def historical_funding_rate(self, symbol: Symbol, starttime: datetime.datetime, endtime: datetime.datetime, instType: InstrumentType):
+    #    """Return Funding Rate for given instrument"""
     
     
 
@@ -436,30 +437,25 @@ class ExchangeBase(AbstractExchangeBase):
     
     def _funding_rate_res_to_dataframe(
         self,
-        data: Union[List[Union[dict, list]], pd.DataFrame],
+        data: Union[Union[dict, list], pd.DataFrame],      
     ) -> pd.DataFrame:
         
         if isinstance(data, pd.DataFrame):
             # Response already formatted as dataframe
             pass
         
-        elif isinstance(data[0], list) or isinstance(data[0], np.ndarray):
-            # Response has unlabeled data (list)
-            data = np.array(data)[:, list(self._funding_rate_column_map.keys())]
-            data = pd.DataFrame(data, columns=list(self._funding_rate_column_map.values()))
-        
         else:
             # Response has labeled data (dict)
-            data: pd.DataFrame = pd.DataFrame(data)
-            data.rename(columns=self._funding_rate_column_map, inplace=True)
-            data = data[self._funding_rate_column_map.values()]
-
+            data: pd.DataFrame = pd.DataFrame(data).loc[:,self._funding_rate_column_map.keys()]
+            data.rename(columns=self._funding_rate_column_map, inplace= True)
+            print(data)         
+            
         #convert timestamp to datetime
-        data = data.iloc[:,FundingRateSchema.timestamp].apply(lambda e:self.ET_to_datatime(e))
-        
+        data.loc[:,FundingRateSchema.timestamp] = data.loc[:,FundingRateSchema.timestamp].apply(lambda e:self.ET_to_datatime(e))
+        print(data)
         #dropping duplicate timestamp
         data = data.groupby(FundingRateSchema.timestamp).first()
-        
+        print(data)
         return data
         
 
@@ -743,38 +739,46 @@ class ExchangeAPIBase(ExchangeBase, AbstractExchangeAPIBase):
     @cached("cache/hisorical_funding_rate", is_method=True, instance_identifier="name")
     def historical_funding_rate(
         self,
-        symbol: Symbol,
-        starttime: datetime =None, #.datetime,
-        endtime: datetime = None, #.datetime,
-        timedelta: datetime = None, #.timedelta,
-        instType: InstrumentType = InstrumentType.PERPETUAL,
+        instType: Union[InstrumentType, str],
+        symbol: Union[Symbol, str],        
+        starttime: datetime.datetime =None, #.datetime,
+        endtime: datetime.datetime = None, #.datetime,
+        limit: int=None,
         use_cache: bool = False ,
         refresh_cache: bool = False,
     ) -> pd.DataFrame: 
         """ Return historical funding rates for given instrument"""
-        _requests = []
-        limit = None
-        instType, symbol = self._parse_instrument(instType, symbol)   
-        start_times, end_times, limits = self._ohlcv_get_request_intervals(starttime, endtime, timedelta, limit)
-       
-        for _starttime, _endtime, limit in zip(start_times, end_times, limits):
-            request = self._historical_funding_rate_prepare_request(instType, symbol, _starttime, _endtime, limit)
-            _requests.append(request)
         
+        
+        _requests = []
+        limit =  self._limit
+              
+        print(symbol)
+        instType, symbol = self._parse_instrument(instType, symbol)  
+        symbol_name = self.get_instrument(instType, symbol)[Instrument.contract_name]
+        #start_times, end_times, limits = self._ohlcv_get_request_intervals(starttime, endtime, limit)
+        #for _starttime, _endtime, limit in zip(start_times, end_times, limits):
+        print(symbol_name)   
+        print(starttime) 
+        print(endtime) 
+        request = self._histrorical_funding_rate_prepare_request(instType, symbol_name,starttime,endtime,limit)
+        
+        print(request)
+        #_requests.append(request)
         response = []
-        for request in _requests:
-            res = self.dispatcher.send_request(request)
-            res = self._ohlcv_extract_response(res)
-            response.extend(res)
-            logger.debug(f"response head: \n{res[:5]}")
+        #for request in _requests:
+        res = self.dispatcher.send_request(request)
+        res = self._histrorical_funding_rate_extract_response(res)
+        #response.extend(res)
+        #logger.debug(f"response head: \n{res[:5]}")
             
         print(response)
         
         df_funding = self._funding_rate_res_to_dataframe(response)
+        print(df_funding)
         
         
-        
-        return df_funding
+        #return df_funding
         
         
         
