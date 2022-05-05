@@ -5,7 +5,7 @@ import os
 import pandas as pd
 from requests import Request
 
-from ..enums import Interval, OrderBookSchema, OrderBookSide
+from ..enums import FundingRateSchema, Interval, OrderBookSchema, OrderBookSide
 from ..feeds import OHLCVColumn
 from .bases import ExchangeAPIBase
 from .instrument_names.coinflex import instrument_names as coinflex_instrument_names
@@ -36,7 +36,7 @@ class CoinFLEX(ExchangeAPIBase):
 
     _base_url = "https://v2api.coinflex.com"
     _max_requests_per_second = 20
-    _limit = 5000
+    _limit = 6
     _start_inclusive = True
     _end_inclusive = True
 
@@ -47,6 +47,10 @@ class CoinFLEX(ExchangeAPIBase):
         "low": OHLCVColumn.low,
         "close": OHLCVColumn.close,
         "volume24h": OHLCVColumn.volume,
+    }
+    _funding_rate_column_map = {
+        "createdAt": FundingRateSchema.timestamp,
+        "fundingRate": FundingRateSchema.funding_rate,
     }
 
     def _ohlcv_prepare_request(self, instType, symbol, interval, starttime, endtime, limit):
@@ -63,7 +67,6 @@ class CoinFLEX(ExchangeAPIBase):
     def _ohlcv_extract_response(self, response):
         if len(response["data"]) == 0:
             # Error has occured
-
             # Raise general exception for now
             # TODO: build exception handling where reponse error can be fixed
             raise Exception("No data found for these parameters")
@@ -96,3 +99,37 @@ class CoinFLEX(ExchangeAPIBase):
 
     def _order_book_quantity_multiplier(self, instType, symbol):
         return 1
+
+    def _histrorical_funding_rate_prepare_request(self, instType, symbol, starttime, endtime, limit):
+        request_url = os.path.join(self._base_url, "v3/funding-rates")
+
+        params = {
+            "marketCode": symbol,
+            "startTime": starttime,
+            "endTime": endtime,
+            # "limit": limit,
+        }
+
+        print(request_url)
+        print(params)
+
+        return Request(
+            "GET",
+            request_url,
+            params=params,
+        )
+
+    def _histrorical_funding_rate_extract_response(self, response):
+
+        if response["success"] == False and response["message"] == "no result, please check your parameters":
+            # Error has occured
+            # Raise general exception for now
+            # TODO: build exception handling where reponse error can be fixed
+            # raise Exception("No data found for these parameters")
+            response["data"] = []
+        elif (
+            response["success"] == False
+            and response["message"] == "startTime and endTime must be within 7 days of each other"
+        ):
+            raise Exception(response["message"])
+        return response["data"]

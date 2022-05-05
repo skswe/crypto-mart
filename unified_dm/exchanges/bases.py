@@ -1,17 +1,28 @@
 import datetime
 import logging
 import math
-from sqlite3 import Row
 import time
 from abc import ABC, abstractmethod
+from sqlite3 import Row
 from typing import Callable, Dict, List, Tuple, Union
 
 import numpy as np
 import pandas as pd
 import requests
 from requests import Request
-from ..enums import FeeInfo, Instrument, InstrumentType, Interval, OHLCVColumn, OrderBookSchema, OrderBookSide, Symbol, FundingRateSchema   
-from ..feeds import OHLCVFeed   
+
+from ..enums import (
+    FeeInfo,
+    FundingRateSchema,
+    Instrument,
+    InstrumentType,
+    Interval,
+    OHLCVColumn,
+    OrderBookSchema,
+    OrderBookSide,
+    Symbol,
+)
+from ..feeds import OHLCVFeed
 from ..globals import BLACKLISTED_SYMBOLS, EARLIEST_OHLCV_DATE, END_OHLCV_DATE, INVALID_DATE
 from ..util import Dispatcher, cached, stack_dict
 
@@ -56,7 +67,7 @@ class AbstractExchangeBase(ABC):
     def _ohlcv_column_map() -> Dict[Union[int, str], str]:
         """Mapping of Exchange OHLCV column representation -> standard OHLCV column names"""
         pass
-    
+
     @property
     @abstractmethod
     def _funding_rate_column_map() -> Dict[Union[int, str], str]:
@@ -164,22 +175,21 @@ class AbstractExchangeAPIBase(AbstractExchangeBase):
     def order_book(self, symbol: Symbol, instType: InstrumentType, depth: int):
         """Return order book snapshot for given instrument"""
         pass
-    
+
     @abstractmethod
     def _histrorical_funding_rate_prepare_request(self, instType, symbol, starttime, endtime, limit) -> Request:
         """Function to set up API request"""
         pass
-    
+
     @abstractmethod
     def _histrorical_funding_rate_extract_response(self, response) -> Union[List, dict]:
-        """Function to extract data from API http response"""  
-        pass        
-    
-    #@abstractmethod
-    #def historical_funding_rate(self, symbol: Symbol, starttime: datetime.datetime, endtime: datetime.datetime, instType: InstrumentType):
+        """Function to extract data from API http response"""
+        pass
+
+    # @abstractmethod
+    # def historical_funding_rate(self, symbol: Symbol, starttime: datetime.datetime, endtime: datetime.datetime, instType: InstrumentType):
     #    """Return Funding Rate for given instrument"""
-    
-    
+
 
 class ExchangeBase(AbstractExchangeBase):
     """Common base to house exchange data structures"""
@@ -434,30 +444,33 @@ class ExchangeBase(AbstractExchangeBase):
         ].astype(float)
 
         return data
-    
+
     def _funding_rate_res_to_dataframe(
         self,
-        data: Union[Union[dict, list], pd.DataFrame],      
+        data: Union[Union[dict, list], pd.DataFrame],
     ) -> pd.DataFrame:
-        
+
         if isinstance(data, pd.DataFrame):
             # Response already formatted as dataframe
             pass
-        
+
         else:
             # Response has labeled data (dict)
-            data: pd.DataFrame = pd.DataFrame(data).loc[:,self._funding_rate_column_map.keys()]
-            data.rename(columns=self._funding_rate_column_map, inplace= True)
-            print(data)         
-            
-        #convert timestamp to datetime
-        data.loc[:,FundingRateSchema.timestamp] = data.loc[:,FundingRateSchema.timestamp].apply(lambda e:self.ET_to_datatime(e))
-        print(data)
-        #dropping duplicate timestamp
-        data = data.groupby(FundingRateSchema.timestamp).first()
-        print(data)
+            data: pd.DataFrame = pd.DataFrame(data).loc[:, self._funding_rate_column_map.keys()]
+            data.rename(columns=self._funding_rate_column_map, inplace=True)
+
+        # convert timestamp to datetime
+        data.loc[:, FundingRateSchema.timestamp] = data.loc[:, FundingRateSchema.timestamp].apply(
+            lambda e: self.ET_to_datetime(e)
+        )
+
+        data = data.set_index(FundingRateSchema.timestamp)
+        # dropping duplicate timestamp
+        # data = data.groupby(FundingRateSchema.timestamp).first()
+        # print(1)
+        # print(len(data))
+
         return data
-        
 
     def ohlcv(
         self,
@@ -727,64 +740,69 @@ class ExchangeAPIBase(ExchangeBase, AbstractExchangeAPIBase):
         res[OrderBookSchema.quantity] = res[OrderBookSchema.quantity] * self._order_book_quantity_multiplier(
             instType.name, symbol_name
         )
-        bids = res[res[OrderBookSchema.side] == OrderBookSide.bid].sort_values(
-            OrderBookSchema.price, ascending=False, ignore_index=True
-        ).iloc[:depth]
-        asks = res[res[OrderBookSchema.side] == OrderBookSide.ask].sort_values(
-            OrderBookSchema.price, ascending=True, ignore_index=True
-        ).iloc[:depth]
+        bids = (
+            res[res[OrderBookSchema.side] == OrderBookSide.bid]
+            .sort_values(OrderBookSchema.price, ascending=False, ignore_index=True)
+            .iloc[:depth]
+        )
+        asks = (
+            res[res[OrderBookSchema.side] == OrderBookSide.ask]
+            .sort_values(OrderBookSchema.price, ascending=True, ignore_index=True)
+            .iloc[:depth]
+        )
         orderbook = pd.concat([bids, asks], ignore_index=True)
         return orderbook
-    
+
     @cached("cache/hisorical_funding_rate", is_method=True, instance_identifier="name")
     def historical_funding_rate(
         self,
         instType: Union[InstrumentType, str],
-        symbol: Union[Symbol, str],        
-        starttime: datetime.datetime =None, #.datetime,
-        endtime: datetime.datetime = None, #.datetime,
-        limit: int=None,
-        use_cache: bool = False ,
+        symbol: Union[Symbol, str],
+        starttime: datetime.datetime = None,  # .datetime,
+        endtime: datetime.datetime = None,  # .datetime,
+        timedelta: datetime.timedelta = None,
+        limit: int = None,
+        use_cache: bool = False,
         refresh_cache: bool = False,
-    ) -> pd.DataFrame: 
-        """ Return historical funding rates for given instrument"""
-        
-        
-        _requests = []
-        limit =  self._limit
-              
-        print(symbol)
-        instType, symbol = self._parse_instrument(instType, symbol)  
+    ) -> pd.DataFrame:
+        """Return historical funding rates for given instrument"""
+
+        instType, symbol = self._parse_instrument(instType, symbol)
+        # symbol_name = self.get_instrument(instType, symbol)[Instrument.contract_name]
+        limit = 50  # self._limit or 100
+
+        interval = Interval.interval_1d
+        starttime = EARLIEST_OHLCV_DATE
+        endtime = datetime.datetime.now()
         symbol_name = self.get_instrument(instType, symbol)[Instrument.contract_name]
-        #start_times, end_times, limits = self._ohlcv_get_request_intervals(starttime, endtime, limit)
-        #for _starttime, _endtime, limit in zip(start_times, end_times, limits):
-        print(symbol_name)   
-        print(starttime) 
-        print(endtime) 
-        request = self._histrorical_funding_rate_prepare_request(instType, symbol_name,starttime,endtime,limit)
-        
-        print(request)
-        #_requests.append(request)
+        interval_name, timedelta = self.intervals[interval]
+        _requests = []
+
+        # print(symbol)
+
+        start_times, end_times, limits = self._ohlcv_get_request_intervals(starttime, endtime, timedelta, limit)
+        for _starttime, _endtime, limit in zip(start_times, end_times, limits):
+            # print(symbol_name)
+            print((self.ET_to_datetime(_starttime)))
+            print(self.ET_to_datetime(_endtime))
+            print(_starttime)
+            print(_endtime)
+            request = self._histrorical_funding_rate_prepare_request(
+                instType, symbol_name, _starttime, _endtime, limit
+            )
+            _requests.append(request)
+
         response = []
-        #for request in _requests:
-        res = self.dispatcher.send_request(request)
-        res = self._histrorical_funding_rate_extract_response(res)
-        #response.extend(res)
-        #logger.debug(f"response head: \n{res[:5]}")
-            
-        print(response)
-        
+        for request in _requests:
+            # print(request)
+            res = self.dispatcher.send_request(request)
+            res = self._histrorical_funding_rate_extract_response(res)
+            print(len(res))
+            response.extend(res)
+        # logger.debug(f"response head: \n{res[:5]}")
+
         df_funding = self._funding_rate_res_to_dataframe(response)
+        pd.set_option("display.max_rows", 1000)
         print(df_funding)
-        
-        
-        #return df_funding
-        
-        
-        
-    
-   
-        
-        
-    
-    
+
+        # return df_funding

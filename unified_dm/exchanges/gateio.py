@@ -118,16 +118,15 @@ class GateIO(ExchangeAPIBase):
         return float(res["quanto_multiplier"])
 
     def _histrorical_funding_rate_prepare_request(self, instType, symbol, starttime, endtime, limit):
-        url = "futures/usdt/funding_rate?contract"
-        params = {
-            "contract": symbol,
-        }
+        url = "futures/usdt/funding_rate"
         request_url = os.path.join(self._base_url,url)
         print(request_url)
         return Request(
                 "GET",
                 request_url,
-                params= params,
+                params= {
+            "contract": symbol,
+        },
         )
     
     def _histrorical_funding_rate_extract_response(self, response):

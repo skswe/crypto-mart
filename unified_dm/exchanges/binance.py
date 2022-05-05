@@ -7,7 +7,7 @@ from wsgiref.util import request_uri
 import pandas as pd
 from requests import Request
 
-from ..enums import InstrumentType, Interval, OrderBookSchema, OrderBookSide, FundingRateSchema
+from ..enums import FundingRateSchema, InstrumentType, Interval, OrderBookSchema, OrderBookSide
 from ..feeds import OHLCVColumn
 from .bases import ExchangeAPIBase
 from .instrument_names.binance import instrument_names as binance_instrument_names
@@ -42,7 +42,7 @@ class Binance(ExchangeAPIBase):
 
     _base_url = "https://fapi.binance.com/fapi/v1"
     _max_requests_per_second = 4
-    _limit = 1500
+    _limit = 1000
     _start_inclusive = True
     _end_inclusive = True
     _ohlcv_column_map = {
@@ -55,7 +55,7 @@ class Binance(ExchangeAPIBase):
     }
     _funding_rate_column_map = {
         "fundingTime": FundingRateSchema.timestamp,
-        "fundingRate": FundingRateSchema.funding_rate 
+        "fundingRate": FundingRateSchema.funding_rate,
     }
 
     def _ohlcv_prepare_request(self, instType, symbol, interval, starttime, endtime, limit):
@@ -121,23 +121,21 @@ class Binance(ExchangeAPIBase):
         )
 
     def _order_book_quantity_multiplier(self, instType, symbol):
-        return 1    
-    
-    
-    def _histrorical_funding_rate_prepare_request(self,instType,symbol,starttime,endtime,limit):
-        #request_url = os.path.join(self._base_url,"/fundingRate")
-        request_url = "https://fapi.binance.com/fapi/v1/fundingRate"
-        params={
-                "symbol": symbol,
-                "limit": limit,
-            },
-        
+        return 1
+
+    def _histrorical_funding_rate_prepare_request(self, instType, symbol, starttime, endtime, limit):
+        request_url = os.path.join(self._base_url, "fundingRate")
+        params = {
+            "symbol": symbol,
+            "limit": limit,
+        }
+
         return Request(
             "GET",
             request_url,
-            params=params,    
+            params=params,
         )
-    
+
     def _histrorical_funding_rate_extract_response(self, response):
         if isinstance(response, list) and "code" in response:
             # Error has occured
@@ -145,12 +143,13 @@ class Binance(ExchangeAPIBase):
             # Raise general exception for now
             # TODO: build exception handling where reponse error can be fixed
             raise Exception(response["msg"])
-        return response  
-    
-    @staticmethod
-    def ET_to_datetime(et):
-        # Convert exchange native time format to datetime
-        if isinstance(et, str):
-            return datetime.datetime.fromisoformat(et).replace(tzinfo=None)
-        else:
-            return datetime.datetime.utcfromtimestamp(et)
+        return response
+
+    # @staticmethod
+    # def ET_to_datetime(et):
+    #   # Convert exchange native time format to datetime
+    #   if isinstance(et, str):
+    #      return datetime.datetime.fromisoformat(et).replace(tzinfo=None)
+    # else:
+    #    print(et)
+    #   return datetime.datetime.utcfromtimestamp(et)

@@ -7,7 +7,7 @@ import numpy as np
 import pandas as pd
 from requests import Request
 
-from ..enums import Interval, OrderBookSchema, OrderBookSide,FundingRateSchema
+from ..enums import FundingRateSchema, Interval, OrderBookSchema, OrderBookSide
 from ..feeds import OHLCVColumn
 from .bases import ExchangeAPIBase
 from .instrument_names.bitmex import instrument_names as bitmex_instrument_names
@@ -47,9 +47,8 @@ class BitMEX(ExchangeAPIBase):
     }
     _funding_rate_column_map = {
         "timestamp": FundingRateSchema.timestamp,
-        "fundingRate": FundingRateSchema.funding_rate 
+        "fundingRate": FundingRateSchema.funding_rate,
     }
-
 
     def _ohlcv_prepare_request(self, type, symbol, interval, starttime, endtime, limit):
         url = "trade/bucketed"
@@ -105,22 +104,24 @@ class BitMEX(ExchangeAPIBase):
     def _order_book_quantity_multiplier(self, instType, symbol):
         return 1
 
-    def _histrorical_funding_rate_prepare_request(self,instType,symbol,starttime,endtime,limit):
-        request_url = os.path.join(self._base_url,"funding")
+    def _histrorical_funding_rate_prepare_request(self, instType, symbol, starttime, endtime, limit):
+        request_url = os.path.join(self._base_url, "funding")
         print(request_url)
-        params={
+        params = (
+            {
                 "symbol": symbol,
-                "startTime":datetime.datetime.fromtimestamp(starttime),
-                "endTime":datetime.datetime.fromtimestamp(endtime),
-                #"count": limit,
+                "startTime": self.ET_to_datetime(starttime),
+                "endTime": self.ET_to_datetime(endtime),
+                "count": limit,
             },
-        
+        )
+
         return Request(
             "GET",
             request_url,
-            params=params,    
+            params=params,
         )
-    
+
     def _histrorical_funding_rate_extract_response(self, response):
         if isinstance(response, list) and "code" in response:
             # Error has occured
@@ -128,8 +129,8 @@ class BitMEX(ExchangeAPIBase):
             # Raise general exception for now
             # TODO: build exception handling where reponse error can be fixed
             raise Exception(response["msg"])
-        return response  
-    
+        return response
+
     @staticmethod
     def ET_to_datetime(et):
         # Convert exchange native time format to datetime

@@ -1,12 +1,14 @@
 import datetime
 import logging
 import os
+from cgi import print_directory
+from wsgiref.util import request_uri
 
 import pandas as pd
 from requests import Request
 from unified_dm.feeds import OHLCVColumn
 
-from ..enums import Interval, OrderBookSchema, OrderBookSide,FundingRateSchema
+from ..enums import FundingRateSchema, Interval, OrderBookSchema, OrderBookSide
 from .bases import ExchangeAPIBase
 from .instrument_names.ftx import instrument_names as ftx_instrument_names
 
@@ -44,10 +46,7 @@ class FTX(ExchangeAPIBase):
         "close": OHLCVColumn.close,
         "volume": OHLCVColumn.volume,
     }
-    _funding_rate_column_map = {
-        "time": FundingRateSchema.timestamp,
-        "rate": FundingRateSchema.funding_rate 
-    }
+    _funding_rate_column_map = {"time": FundingRateSchema.timestamp, "rate": FundingRateSchema.funding_rate}
 
     def _ohlcv_prepare_request(self, instType, symbol, interval, starttime, endtime, limit):
         url = f"markets/{symbol}/candles"
@@ -101,20 +100,22 @@ class FTX(ExchangeAPIBase):
 
     def _order_book_quantity_multiplier(self, instType, symbol):
         return 1
-    
+
     def _histrorical_funding_rate_prepare_request(self, instType, symbol, starttime, endtime, limit):
-        request_url = os.path.join(self._base_url,"funding_rates")
-        
+        request_url = os.path.join(self._base_url, "funding_rates")
+        # request_url = "https://ftx.com/api/funding_rates"
+        print(self.ET_to_seconds(starttime))
+        print(self.ET_to_seconds(endtime))
         return Request(
-                "GET",
-                request_url,
-                params= {
+            "GET",
+            request_url,
+            params={
                 "future": symbol,
-                "startTime": datetime_to_ET(starttime),
-                "endTime": datetime_to_ET(endtime),
-                },
+                "startTime": self.ET_to_seconds(starttime),
+                "endTime": self.ET_to_seconds(endtime),
+            },
         )
-    
+
     def _histrorical_funding_rate_extract_response(self, response):
         if response["success"] != True:
             # Error has occured
