@@ -16,7 +16,7 @@ def copy_metadata(func):
     return wrapper
 
 
-class OHLCVBase(pd.DataFrame):
+class FeedBase(pd.DataFrame):
     @classmethod
     def _pandas_constructor(cls, *args, **kwargs):
         return cls(*args, **kwargs)
@@ -78,7 +78,7 @@ class OHLCVBase(pd.DataFrame):
         return super().__str__() + self._underlying_info + "\n"
 
 
-class OHLCVFeed(OHLCVBase):
+class OHLCVFeed(FeedBase):
     _metadata = ["exchange_name", "instType", "symbol", "interval", "orig_starttime", "orig_endtime"]
 
     def __init__(
