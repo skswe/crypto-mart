@@ -39,7 +39,7 @@ class CoinFLEX(ExchangeAPIBase):
     _limit = 6
     _start_inclusive = True
     _end_inclusive = True
-
+    _tolerance = datetime.timedelta(hours=1)
     _ohlcv_column_map = {
         "timestamp": OHLCVColumn.open_time,
         "open": OHLCVColumn.open,

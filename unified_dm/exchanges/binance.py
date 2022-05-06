@@ -45,6 +45,7 @@ class Binance(ExchangeAPIBase):
     _limit = 1000
     _start_inclusive = True
     _end_inclusive = True
+    _tolerance = "8h"
     _ohlcv_column_map = {
         0: OHLCVColumn.open_time,
         1: OHLCVColumn.open,

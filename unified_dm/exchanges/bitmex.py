@@ -37,6 +37,7 @@ class BitMEX(ExchangeAPIBase):
     _limit = 1000
     _start_inclusive = True
     _end_inclusive = True
+    _tolerance = "8h"
     _ohlcv_column_map = {
         "timestamp": OHLCVColumn.open_time,
         "open": OHLCVColumn.open,
@@ -106,15 +107,13 @@ class BitMEX(ExchangeAPIBase):
 
     def _histrorical_funding_rate_prepare_request(self, instType, symbol, starttime, endtime, limit):
         request_url = os.path.join(self._base_url, "funding")
-        print(request_url)
-        params = (
-            {
-                "symbol": symbol,
-                "startTime": self.ET_to_datetime(starttime),
-                "endTime": self.ET_to_datetime(endtime),
-                "count": limit,
-            },
-        )
+        print(self.ET_to_datetime(starttime))
+        params = {
+            "symbol": symbol,
+            "startTime": self.ET_to_datetime(starttime),
+            "endTime": self.ET_to_datetime(endtime),
+            "count": limit,
+        }
 
         return Request(
             "GET",

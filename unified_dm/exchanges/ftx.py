@@ -35,9 +35,10 @@ class FTX(ExchangeAPIBase):
 
     _base_url = "https://ftx.com/api"
     _max_requests_per_second = 7
-    _limit = 1500
+    _limit = 150
     _start_inclusive = True
     _end_inclusive = True
+    _tolerance = "8h"
     _ohlcv_column_map = {
         "startTime": OHLCVColumn.open_time,
         "open": OHLCVColumn.open,
@@ -111,8 +112,8 @@ class FTX(ExchangeAPIBase):
             request_url,
             params={
                 "future": symbol,
-                "startTime": self.ET_to_seconds(starttime),
-                "endTime": self.ET_to_seconds(endtime),
+                "start_time": self.ET_to_seconds(starttime),
+                "end_time": self.ET_to_seconds(endtime),
             },
         )
 

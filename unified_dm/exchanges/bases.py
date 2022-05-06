@@ -112,6 +112,26 @@ class AbstractExchangeBase(ABC):
         """
         pass
 
+    @abstractmethod
+    def historical_funding_rate(
+        self,
+        instType: Union[InstrumentType, str],
+        symbol: Union[Symbol, str],
+        starttime: datetime.datetime = None,  # .datetime,
+        endtime: datetime.datetime = None,  # .datetime,
+        timedelta: datetime.timedelta = None,
+        limit: int = None,
+        use_cache: bool = False,
+        refresh_cache: bool = False,
+    ) -> pd.DataFrame:
+        """Return historical funding rates for given instrument"""
+        pass
+
+    @abstractmethod
+    def _ohlcv_merge_funding_rate(self, ohlcvDf: pd.DataFrame, fundingRateDf: pd.DataFrame) -> pd.DataFrame:
+        """Return ohlcv with funding rates for given instrument"""
+        pass
+
 
 class AbstractExchangeAPIBase(AbstractExchangeBase):
     """Properties and methods that must be defined in all exchanges that query a public API"""
@@ -143,6 +163,12 @@ class AbstractExchangeAPIBase(AbstractExchangeBase):
     @property
     @abstractmethod
     def _end_inclusive() -> bool:
+        """The last open_time returned will match endtime parameter"""
+        pass
+
+    @property
+    @abstractmethod
+    def _tolerance() -> datetime.timedelta:
         """The last open_time returned will match endtime parameter"""
         pass
 
@@ -465,10 +491,8 @@ class ExchangeBase(AbstractExchangeBase):
         )
 
         data = data.set_index(FundingRateSchema.timestamp)
-        # dropping duplicate timestamp
-        # data = data.groupby(FundingRateSchema.timestamp).first()
-        # print(1)
-        # print(len(data))
+
+        # data[:, FundingRateSchema.funding_rate] = data[:, FundingRateSchema.funding_rate].astype(float)
 
         return data
 
@@ -481,6 +505,7 @@ class ExchangeBase(AbstractExchangeBase):
         endtime: Union[
             datetime.datetime, Tuple[int]
         ] = None,  # endtime is the time that occurs immediately after the final close time
+        include_funding_rate: bool = True,
         use_cache: bool = True,  # Cache results to prevent repeated requests
         refresh_cache: bool = False,
     ) -> OHLCVFeed:
@@ -524,6 +549,18 @@ class ExchangeBase(AbstractExchangeBase):
             use_cache=use_cache,
             refresh_cache=refresh_cache,
         )
+
+        if include_funding_rate:
+            fundingDf = self.historical_funding_rate(
+                instType,
+                symbol_name,
+                starttime,
+                endtime,
+                timedelta,
+                use_cache=use_cache,
+                refresh_cache=refresh_cache,
+            )
+            df = self._ohlcv_merge_funding_rate(df, fundingDf)
 
         missing_rows = df.iloc[:, 1].isna().sum()
         if missing_rows > 0:
@@ -758,51 +795,45 @@ class ExchangeAPIBase(ExchangeBase, AbstractExchangeAPIBase):
         self,
         instType: Union[InstrumentType, str],
         symbol: Union[Symbol, str],
-        starttime: datetime.datetime = None,  # .datetime,
-        endtime: datetime.datetime = None,  # .datetime,
-        timedelta: datetime.timedelta = None,
+        starttime: datetime.datetime,
+        endtime: datetime.datetime,
+        timedelta: datetime.timedelta,
         limit: int = None,
-        use_cache: bool = False,
+        use_cache: bool = True,
         refresh_cache: bool = False,
     ) -> pd.DataFrame:
         """Return historical funding rates for given instrument"""
 
-        instType, symbol = self._parse_instrument(instType, symbol)
-        # symbol_name = self.get_instrument(instType, symbol)[Instrument.contract_name]
-        limit = 50  # self._limit or 100
+        limit = self._limit or 100
 
-        interval = Interval.interval_1d
-        starttime = EARLIEST_OHLCV_DATE
-        endtime = datetime.datetime.now()
-        symbol_name = self.get_instrument(instType, symbol)[Instrument.contract_name]
-        interval_name, timedelta = self.intervals[interval]
         _requests = []
-
-        # print(symbol)
 
         start_times, end_times, limits = self._ohlcv_get_request_intervals(starttime, endtime, timedelta, limit)
         for _starttime, _endtime, limit in zip(start_times, end_times, limits):
-            # print(symbol_name)
-            print((self.ET_to_datetime(_starttime)))
-            print(self.ET_to_datetime(_endtime))
-            print(_starttime)
+            request = self._histrorical_funding_rate_prepare_request(instType, symbol, _starttime, _endtime, limit)
             print(_endtime)
-            request = self._histrorical_funding_rate_prepare_request(
-                instType, symbol_name, _starttime, _endtime, limit
-            )
             _requests.append(request)
 
         response = []
         for request in _requests:
-            # print(request)
             res = self.dispatcher.send_request(request)
             res = self._histrorical_funding_rate_extract_response(res)
             print(len(res))
             response.extend(res)
-        # logger.debug(f"response head: \n{res[:5]}")
 
         df_funding = self._funding_rate_res_to_dataframe(response)
-        pd.set_option("display.max_rows", 1000)
-        print(df_funding)
 
-        # return df_funding
+        return df_funding
+
+    def _ohlcv_merge_funding_rate(self, ohlcvDf: pd.DataFrame, fundingRateDf: pd.DataFrame) -> pd.DataFrame:
+        ohlcvDf.sort_values("open_time", inplace=True)
+        fundingRateDf["open_time"] = fundingRateDf.index.values.astype("datetime64[s]")
+        fundingRateDf.sort_values("open_time", inplace=True)
+        tolerance = self._tolerance or datetime.timedelta(hours=8)
+
+        fundingRateDf.to_csv(r"./data/funding.txt", header=True, index=True, sep=" ", mode="w")
+        pd.merge_asof(ohlcvDf, fundingRateDf, on="open_time", tolerance=pd.Timedelta("8h")).to_csv(
+            r"./data/Mergeddataframe2.txt", header=True, index=True, sep=" ", mode="w"
+        )
+        return pd.merge_asof(ohlcvDf, fundingRateDf, on="open_time", allow_exact_matches=False)  # direction="forward"
+        # , tolerance=tolerance
