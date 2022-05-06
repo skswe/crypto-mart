@@ -32,10 +32,6 @@ class Kucoin(ExchangeAPIBase):
         Interval.interval_1d: (1440, datetime.timedelta(days=1)),
     }
 
-    @property
-    def fee_pct(self):
-        return 0.0006
-
     _base_url = "https://api-futures.kucoin.com/api/v1"
     _max_requests_per_second = 10
     _limit = 200

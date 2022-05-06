@@ -29,10 +29,6 @@ class OKEx(ExchangeAPIBase):
         Interval.interval_1d: ("1Dutc", datetime.timedelta(days=1)),
     }
 
-    @property
-    def fee_pct(self):
-        return 0.0005
-
     _base_url = "https://www.okex.com/api/v5"
     _max_requests_per_second = 5
     _limit = 100

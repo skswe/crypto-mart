@@ -28,10 +28,6 @@ class BitMEX(ExchangeAPIBase):
         Interval.interval_1d: ("1d", datetime.timedelta(days=1)),
     }
 
-    @property
-    def fee_pct(self):
-        return 0.0005
-
     _base_url = "https://www.bitmex.com/api/v1"
     _max_requests_per_second = 0.5
     _limit = 1000

@@ -34,10 +34,6 @@ class Binance(ExchangeAPIBase):
         Interval.interval_1d: ("1d", datetime.timedelta(days=1)),
     }
 
-    @property
-    def fee_pct(self):
-        return 0.0004
-
     _base_url = "https://fapi.binance.com/fapi/v1"
     _max_requests_per_second = 4
     _limit = 1500

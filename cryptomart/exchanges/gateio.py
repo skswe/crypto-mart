@@ -30,10 +30,6 @@ class GateIO(ExchangeAPIBase):
         Interval.interval_1d: ("1d", datetime.timedelta(days=1)),
     }
 
-    @property
-    def fee_pct(self):
-        return 0.00075
-
     _base_url = "https://api.gateio.ws/api/v4"
     _max_requests_per_second = 100
     _limit = 200

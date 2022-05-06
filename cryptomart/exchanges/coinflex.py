@@ -30,10 +30,6 @@ class CoinFLEX(ExchangeAPIBase):
         Interval.interval_1d: ("86400s", datetime.timedelta(days=1)),
     }
 
-    @property
-    def fee_pct(self):
-        return 0.0005
-
     _base_url = "https://v2api.coinflex.com"
     _max_requests_per_second = 20
     _limit = 5000

@@ -33,10 +33,6 @@ class Bybit(ExchangeAPIBase):
         Interval.interval_1d: ("D", datetime.timedelta(days=1)),
     }
 
-    @property
-    def fee_pct(self):
-        return 0.0006
-
     _base_url = "https://api.bybit.com"
     _max_requests_per_second = 40
     _limit = 200

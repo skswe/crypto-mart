@@ -27,10 +27,6 @@ class FTX(ExchangeAPIBase):
         Interval.interval_1d: (86400, datetime.timedelta(days=1)),
     }
 
-    @property
-    def fee_pct(self):
-        return 0.0007
-
     _base_url = "https://ftx.com/api"
     _max_requests_per_second = 7
     _limit = 1500
