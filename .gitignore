@@ -3,6 +3,7 @@ __pycache__
 .pytest_cache
 *.pyc
 *.ipynb
+*.egg-info
 
 # cache
 cache
