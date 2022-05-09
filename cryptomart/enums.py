@@ -11,6 +11,7 @@ class OHLCVColumn(NameEnum):
     close = "close"
     volume = "volume"
     returns = "returns"
+    funding_rate = "funding_rate"
 
 
 class Instrument(NameEnum):
@@ -43,6 +44,17 @@ class OrderBookSide(NameEnum):
 
     ask = "a"
     bid = "b"
+
+
+class FundingRateSchema(NameEnum):
+    "Column Schema for Funding rate structure"
+    symbol = "symbol"
+
+    timestamp = "timestamp"
+    """Timestamp of Funding Rate"""
+
+    funding_rate = "funding_rate"
+    """Value of Funding Rate """
 
 
 class Exchange(NameEnum):

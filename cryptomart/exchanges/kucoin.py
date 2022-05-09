@@ -6,7 +6,7 @@ import pandas as pd
 from pyutil.cache import cached
 from requests import Request, get
 
-from ..enums import Interval, OrderBookSchema, OrderBookSide
+from ..enums import FundingRateSchema, Interval, OrderBookSchema, OrderBookSide
 from ..feeds import OHLCVColumn
 from .base import ExchangeAPIBase
 from .instrument_names.kucoin import instrument_names as kucoin_instrument_names
@@ -44,6 +44,10 @@ class Kucoin(ExchangeAPIBase):
         3: OHLCVColumn.low,
         4: OHLCVColumn.close,
         5: OHLCVColumn.volume,
+    }
+    _funding_rate_column_map = {
+        "timesPoint": FundingRateSchema.timestamp,
+        "fundingRate": FundingRateSchema.funding_rate,
     }
 
     def _ohlcv_prepare_request(self, symbol, instType, interval, starttime, endtime, limit):
@@ -101,6 +105,31 @@ class Kucoin(ExchangeAPIBase):
         request_url = os.path.join(self._base_url, f"contracts/{symbol}")
         res = get(request_url).json()
         return float(res["data"]["multiplier"])
+
+    def _histrorical_funding_rate_prepare_request(self, instType, symbol, starttime, endtime, limit):
+        request_url = os.path.join(self._base_url, "funding-history")
+        print(request_url)
+        params = {
+            "symbol": "XBTUSDM",
+            # "startAt": starttime,
+            # "endAt": endtime,
+        }
+        print(params)
+        return Request(
+            "GET",
+            request_url,
+            params=params,
+        )
+
+    def _histrorical_funding_rate_extract_response(self, response):
+        print(response)
+        if response["code"] != "200000":
+            # Error has occured
+
+            # Raise general exception for now
+            # TODO: build exception handling where reponse error can be fixed
+            raise Exception(response["msg"])
+        return response["dataList"]
 
 
 _exchange_export = Kucoin

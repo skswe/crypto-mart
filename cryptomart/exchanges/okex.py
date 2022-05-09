@@ -7,7 +7,7 @@ import pandas as pd
 from pyutil.cache import cached
 from requests import Request, get
 
-from ..enums import Interval, OrderBookSchema, OrderBookSide
+from ..enums import FundingRateSchema, Interval, OrderBookSchema, OrderBookSide
 from ..feeds import OHLCVColumn
 from .base import ExchangeAPIBase
 from .instrument_names.okex import instrument_names as okex_instrument_names
@@ -31,7 +31,7 @@ class OKEx(ExchangeAPIBase):
 
     _base_url = "https://www.okex.com/api/v5"
     _max_requests_per_second = 5
-    _limit = 100
+    _limit = 1000
     _start_inclusive = False
     _end_inclusive = True
     _ohlcv_column_map = {
@@ -41,6 +41,10 @@ class OKEx(ExchangeAPIBase):
         3: OHLCVColumn.low,
         4: OHLCVColumn.close,
         6: OHLCVColumn.volume,
+    }
+    _funding_rate_column_map = {
+        "fundingTime": FundingRateSchema.timestamp,
+        "fundingRate": FundingRateSchema.funding_rate,
     }
 
     def _ohlcv_prepare_request(self, symbol, instType, interval, starttime, endtime, limit):
@@ -119,6 +123,33 @@ class OKEx(ExchangeAPIBase):
         res = get(request_url, params).json()
         multiplier = int(res["data"][0]["ctVal"])
         return multiplier
+
+    def _histrorical_funding_rate_prepare_request(self, instType, symbol, starttime, endtime, limit):
+        request_url = os.path.join(self._base_url, "public/funding-rate-history")
+        print(request_url)
+        params = {
+            "instId": symbol,
+            "before": starttime,
+            "after": endtime,
+            "limit": limit,
+        }
+
+        return Request(
+            "GET",
+            request_url,
+            params=params,
+        )
+
+    def _histrorical_funding_rate_extract_response(self, response):
+        # print(response)
+        if int(response["code"]) != 0:
+            # Error has occured
+
+            # Raise general exception for now
+            # TODO: build exception handling where reponse error can be fixed
+            raise Exception(response["msg"])
+
+        return response["data"]
 
 
 _exchange_export = OKEx

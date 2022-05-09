@@ -6,7 +6,7 @@ import pandas as pd
 from cryptomart.feeds import OHLCVColumn
 from requests import Request
 
-from ..enums import Interval, OrderBookSchema, OrderBookSide
+from ..enums import FundingRateSchema, Interval, OrderBookSchema, OrderBookSide
 from .base import ExchangeAPIBase
 from .instrument_names.bybit import instrument_names as bybit_instrument_names
 
@@ -46,6 +46,10 @@ class Bybit(ExchangeAPIBase):
         "low": OHLCVColumn.low,
         "close": OHLCVColumn.close,
         "volume": OHLCVColumn.volume,
+    }
+    _funding_rate_column_map = {
+        "funding_rate_timestamp": FundingRateSchema.timestamp,
+        "funding_rate": FundingRateSchema.funding_rate,
     }
 
     def _ohlcv_prepare_request(self, symbol, instType, interval, starttime, endtime, limit):
@@ -100,6 +104,26 @@ class Bybit(ExchangeAPIBase):
 
     def _order_book_quantity_multiplier(self, symbol, instType, **kwargs):
         return 1
+
+    def _histrorical_funding_rate_prepare_request(self, instType, symbol, starttime, endtime, limit):
+        request_url = os.path.join(self._base_url, "v2/public/funding/prev-funding-rate")
+
+        return Request(
+            "GET",
+            request_url,
+            params={
+                "symbol": symbol,
+            },
+        )
+
+    def _histrorical_funding_rate_extract_response(self, response):
+        if response["ret_msg"] != "OK":
+            # Error has occured
+
+            # Raise general exception for now
+            # TODO: build exception handling where reponse error can be fixed
+            raise Exception(response["error"])
+        return response
 
     @staticmethod
     def ET_to_datetime(et):

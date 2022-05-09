@@ -12,7 +12,16 @@ from pyutil.cache import cached
 from pyutil.dicts import stack_dict
 from requests import Request
 
-from ..enums import Instrument, InstrumentType, Interval, OHLCVColumn, OrderBookSchema, OrderBookSide, Symbol
+from ..enums import (
+    FundingRateSchema,
+    Instrument,
+    InstrumentType,
+    Interval,
+    OHLCVColumn,
+    OrderBookSchema,
+    OrderBookSide,
+    Symbol,
+)
 from ..feeds import OHLCVFeed
 from ..globals import EARLIEST_OHLCV_DATE, END_OHLCV_DATE, INVALID_DATE
 from ..util import Dispatcher
@@ -61,6 +70,12 @@ class AbstractExchangeAPIBase(ABC):
 
     @property
     @abstractmethod
+    def _funding_rate_column_map() -> Dict[Union[int, str], str]:
+        """Mapping of Exchange Funding Rate column representation -> standard Funding Rate column names"""
+        pass
+
+    @property
+    @abstractmethod
     def _base_url() -> str:
         """API Base URL for all http requests"""
         pass
@@ -86,6 +101,12 @@ class AbstractExchangeAPIBase(ABC):
     @property
     @abstractmethod
     def _end_inclusive() -> bool:
+        """The last open_time returned will match endtime parameter"""
+        pass
+
+    @property
+    @abstractmethod
+    def _tolerance() -> datetime.timedelta:
         """The last open_time returned will match endtime parameter"""
         pass
 
@@ -115,8 +136,13 @@ class AbstractExchangeAPIBase(ABC):
         pass
 
     @abstractmethod
-    def order_book(self, symbol: Symbol, instType: InstrumentType, depth: int):
-        """Return order book snapshot for given instrument"""
+    def _histrorical_funding_rate_prepare_request(self, instType, symbol, starttime, endtime, limit) -> Request:
+        """Function to set up API request"""
+        pass
+
+    @abstractmethod
+    def _histrorical_funding_rate_extract_response(self, response) -> Union[List, dict]:
+        """Function to extract data from API http response"""
         pass
 
 
@@ -223,6 +249,13 @@ class ExchangeAPIBase(AbstractExchangeAPIBase):
         except IndexError:
             return False
 
+    @property
+    def missing_instruments(self):
+        """Returns instruments that do not have a listing date"""
+        return self.active_instruments.merge(self.all_instruments, how="right").pipe(
+            lambda df: df[df[Instrument.listing_date].isna()]
+        )[[Instrument.symbol, Instrument.instType, Instrument.contract_name]]
+
     def order_book(
         self,
         symbol: Symbol,
@@ -269,6 +302,7 @@ class ExchangeAPIBase(AbstractExchangeAPIBase):
         endtime: Union[
             datetime.datetime, Tuple[int]
         ] = None,  # endtime is the time that occurs immediately after the final close time
+        include_funding_rate: bool = True,
         disable_cache=False,
         refresh_cache=False,
     ) -> OHLCVFeed:
@@ -317,12 +351,61 @@ class ExchangeAPIBase(AbstractExchangeAPIBase):
             },
         )
 
+        if include_funding_rate:
+            funding_df = self.historical_funding_rate(
+                instType,
+                symbol_name,
+                starttime,
+                endtime,
+                timedelta,
+                cache_kwargs={
+                    "disabled": disable_cache,
+                    "refresh": refresh_cache,
+                    "path": os.path.join(self.cache_path, "historical_funding_rate"),
+                },
+            )
+            df = self._ohlcv_merge_funding_rate(df, funding_df)
+
         missing_rows = df.iloc[:, 1].isna().sum()
         if missing_rows > 0:
             logger.info(f"The DataFrame has {missing_rows} missing row(s)")
         logger.info("Done OHLCV Request")
 
         return OHLCVFeed(df, self.name, symbol, instType, interval, starttime, endtime)
+
+    @cached("/tmp/cache/historical_funding_rate", is_method=True, instance_identifier="name")
+    def historical_funding_rate(
+        self,
+        instType: Union[InstrumentType, str],
+        symbol: Union[Symbol, str],
+        starttime: datetime.datetime,
+        endtime: datetime.datetime,
+        timedelta: datetime.timedelta,
+        limit: int = None,
+        cache_kwargs={},
+    ) -> pd.DataFrame:
+        """Return historical funding rates for given instrument"""
+
+        limit = self._limit or 100
+
+        _requests = []
+
+        start_times, end_times, limits = self._ohlcv_get_request_intervals(starttime, endtime, timedelta, limit)
+        for _starttime, _endtime, limit in zip(start_times, end_times, limits):
+            request = self._histrorical_funding_rate_prepare_request(instType, symbol, _starttime, _endtime, limit)
+            print(_endtime)
+            _requests.append(request)
+
+        response = []
+        for request in _requests:
+            res = self.dispatcher.send_request(request)
+            res = self._histrorical_funding_rate_extract_response(res)
+            print(len(res))
+            response.extend(res)
+
+        df_funding = self._funding_rate_res_to_dataframe(response)
+
+        return df_funding
 
     @cached("/tmp/cache/ohlcv", is_method=True, instance_identifiers=["name"])
     def _ohlcv(
@@ -544,12 +627,18 @@ class ExchangeAPIBase(AbstractExchangeAPIBase):
 
         return data
 
-    @property
-    def missing_instruments(self):
-        """Returns instruments that do not have a listing date"""
-        return self.active_instruments.merge(self.all_instruments, how="right").pipe(
-            lambda df: df[df[Instrument.listing_date].isna()]
-        )[[Instrument.symbol, Instrument.instType, Instrument.contract_name]]
+    def _ohlcv_merge_funding_rate(self, ohlcvDf: pd.DataFrame, fundingRateDf: pd.DataFrame) -> pd.DataFrame:
+        ohlcvDf.sort_values("open_time", inplace=True)
+        fundingRateDf["open_time"] = fundingRateDf.index.values.astype("datetime64[s]")
+        fundingRateDf.sort_values("open_time", inplace=True)
+        tolerance = self._tolerance or datetime.timedelta(hours=8)
+
+        fundingRateDf.to_csv(r"./data/funding.txt", header=True, index=True, sep=" ", mode="w")
+        pd.merge_asof(ohlcvDf, fundingRateDf, on="open_time", tolerance=pd.Timedelta("8h")).to_csv(
+            r"./data/Mergeddataframe2.txt", header=True, index=True, sep=" ", mode="w"
+        )
+        return pd.merge_asof(ohlcvDf, fundingRateDf, on="open_time", allow_exact_matches=False)  # direction="forward"
+        # , tolerance=tolerance
 
     def _ohlcv_get_default_starttime(self, starttime, symbol, instType):
         """Returns listing date for given instrument if starttime is none"""

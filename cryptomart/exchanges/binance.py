@@ -5,7 +5,7 @@ import os
 import pandas as pd
 from requests import Request
 
-from ..enums import InstrumentType, Interval, OrderBookSchema, OrderBookSide
+from ..enums import FundingRateSchema, InstrumentType, Interval, OrderBookSchema, OrderBookSide
 from ..feeds import OHLCVColumn
 from .base import ExchangeAPIBase
 from .instrument_names.binance import instrument_names as binance_instrument_names
@@ -36,9 +36,10 @@ class Binance(ExchangeAPIBase):
 
     _base_url = "https://fapi.binance.com/fapi/v1"
     _max_requests_per_second = 4
-    _limit = 1500
+    _limit = 1000
     _start_inclusive = True
     _end_inclusive = True
+    _tolerance = "8h"
     _ohlcv_column_map = {
         0: OHLCVColumn.open_time,
         1: OHLCVColumn.open,
@@ -46,6 +47,10 @@ class Binance(ExchangeAPIBase):
         3: OHLCVColumn.low,
         4: OHLCVColumn.close,
         5: OHLCVColumn.volume,
+    }
+    _funding_rate_column_map = {
+        "fundingTime": FundingRateSchema.timestamp,
+        "fundingRate": FundingRateSchema.funding_rate,
     }
 
     def _ohlcv_prepare_request(self, symbol, instType, interval, starttime, endtime, limit):
@@ -112,6 +117,28 @@ class Binance(ExchangeAPIBase):
 
     def _order_book_quantity_multiplier(self, symbol, instType, **kwargs):
         return 1
+
+    def _histrorical_funding_rate_prepare_request(self, instType, symbol, starttime, endtime, limit):
+        request_url = os.path.join(self._base_url, "fundingRate")
+        params = {
+            "symbol": symbol,
+            "limit": limit,
+        }
+
+        return Request(
+            "GET",
+            request_url,
+            params=params,
+        )
+
+    def _histrorical_funding_rate_extract_response(self, response):
+        if isinstance(response, list) and "code" in response:
+            # Error has occured
+
+            # Raise general exception for now
+            # TODO: build exception handling where reponse error can be fixed
+            raise Exception(response["msg"])
+        return response
 
 
 _exchange_export = Binance

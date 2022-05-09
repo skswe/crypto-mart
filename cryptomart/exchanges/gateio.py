@@ -6,7 +6,7 @@ import pandas as pd
 from pyutil.cache import cached
 from requests import Request, get
 
-from ..enums import Interval, OrderBookSchema, OrderBookSide
+from ..enums import Interval, OrderBookSchema, OrderBookSide,FundingRateSchema
 from ..feeds import OHLCVColumn
 from .base import ExchangeAPIBase
 from .instrument_names.gateio import instrument_names as gateio_instrument_names
@@ -42,6 +42,10 @@ class GateIO(ExchangeAPIBase):
         "l": OHLCVColumn.low,
         "c": OHLCVColumn.close,
         "v": OHLCVColumn.volume,
+    }
+    _funding_rate_column_map = {
+        "t": FundingRateSchema.timestamp,
+        "r": FundingRateSchema.funding_rate 
     }
 
     def _ohlcv_prepare_request(self, symbol, instType, interval, starttime, endtime, limit):
@@ -109,6 +113,27 @@ class GateIO(ExchangeAPIBase):
         res = get(request_url).json()
         return float(res["quanto_multiplier"])
 
+    def _histrorical_funding_rate_prepare_request(self, instType, symbol, starttime, endtime, limit):
+        url = "futures/usdt/funding_rate"
+        request_url = os.path.join(self._base_url,url)
+        print(request_url)
+        return Request(
+                "GET",
+                request_url,
+                params= {
+            "contract": symbol,
+        },
+        )
+    
+    def _histrorical_funding_rate_extract_response(self, response):
+        if isinstance(response, list) and "code" in response:
+            # Error has occured
+
+            # Raise general exception for now
+            # TODO: build exception handling where reponse error can be fixed
+            raise Exception(response["msg"])
+        return response
+    
     @staticmethod
     def ET_to_datetime(et):
         # Convert exchange native time format to datetime

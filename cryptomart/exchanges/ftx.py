@@ -6,7 +6,7 @@ import pandas as pd
 from cryptomart.feeds import OHLCVColumn
 from requests import Request
 
-from ..enums import Interval, OrderBookSchema, OrderBookSide
+from ..enums import FundingRateSchema, Interval, OrderBookSchema, OrderBookSide
 from .base import ExchangeAPIBase
 from .instrument_names.ftx import instrument_names as ftx_instrument_names
 
@@ -29,9 +29,10 @@ class FTX(ExchangeAPIBase):
 
     _base_url = "https://ftx.com/api"
     _max_requests_per_second = 7
-    _limit = 1500
+    _limit = 150
     _start_inclusive = True
     _end_inclusive = True
+    _tolerance = "8h"
     _ohlcv_column_map = {
         "startTime": OHLCVColumn.open_time,
         "open": OHLCVColumn.open,
@@ -40,6 +41,7 @@ class FTX(ExchangeAPIBase):
         "close": OHLCVColumn.close,
         "volume": OHLCVColumn.volume,
     }
+    _funding_rate_column_map = {"time": FundingRateSchema.timestamp, "rate": FundingRateSchema.funding_rate}
 
     def _ohlcv_prepare_request(self, symbol, instType, interval, starttime, endtime, limit):
         url = f"markets/{symbol}/candles"
@@ -93,6 +95,30 @@ class FTX(ExchangeAPIBase):
 
     def _order_book_quantity_multiplier(self, symbol, instType, **kwargs):
         return 1
+
+    def _histrorical_funding_rate_prepare_request(self, instType, symbol, starttime, endtime, limit):
+        request_url = os.path.join(self._base_url, "funding_rates")
+        # request_url = "https://ftx.com/api/funding_rates"
+        print(self.ET_to_seconds(starttime))
+        print(self.ET_to_seconds(endtime))
+        return Request(
+            "GET",
+            request_url,
+            params={
+                "future": symbol,
+                "start_time": self.ET_to_seconds(starttime),
+                "end_time": self.ET_to_seconds(endtime),
+            },
+        )
+
+    def _histrorical_funding_rate_extract_response(self, response):
+        if response["success"] != True:
+            # Error has occured
+
+            # Raise general exception for now
+            # TODO: build exception handling where reponse error can be fixed
+            raise Exception(response["error"])
+        return response["result"]
 
     @staticmethod
     def ET_to_datetime(et):
