@@ -627,6 +627,31 @@ class ExchangeAPIBase(AbstractExchangeAPIBase):
 
         return data
 
+    def _funding_rate_res_to_dataframe(
+        self,
+        data: Union[Union[dict, list], pd.DataFrame],
+    ) -> pd.DataFrame:
+
+        if isinstance(data, pd.DataFrame):
+            # Response already formatted as dataframe
+            pass
+
+        else:
+            # Response has labeled data (dict)
+            data: pd.DataFrame = pd.DataFrame(data).loc[:, self._funding_rate_column_map.keys()]
+            data.rename(columns=self._funding_rate_column_map, inplace=True)
+
+        # convert timestamp to datetime
+        data.loc[:, FundingRateSchema.timestamp] = data.loc[:, FundingRateSchema.timestamp].apply(
+            lambda e: self.ET_to_datetime(e)
+        )
+
+        data = data.set_index(FundingRateSchema.timestamp)
+
+        # data[:, FundingRateSchema.funding_rate] = data[:, FundingRateSchema.funding_rate].astype(float)
+
+        return data
+
     def _ohlcv_merge_funding_rate(self, ohlcvDf: pd.DataFrame, fundingRateDf: pd.DataFrame) -> pd.DataFrame:
         ohlcvDf.sort_values("open_time", inplace=True)
         fundingRateDf["open_time"] = fundingRateDf.index.values.astype("datetime64[s]")
