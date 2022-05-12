@@ -88,8 +88,14 @@ class AbstractExchangeAPIBase(ABC):
 
     @property
     @abstractmethod
-    def _limit() -> int:
-        """Maximum number of datapoints returned in a request"""
+    def _ohlcv_limit() -> int:
+        """Maximum number of datapoints returned in a ohlcv request"""
+        pass
+
+    @property
+    @abstractmethod
+    def _funding_rate_limit() -> int:
+        """Maximum number of datapoints returned in a funding rate request"""
         pass
 
     @property
@@ -373,7 +379,7 @@ class ExchangeAPIBase(AbstractExchangeAPIBase):
 
         return OHLCVFeed(df, self.name, symbol, instType, interval, starttime, endtime)
 
-    @cached("/tmp/cache/historical_funding_rate", is_method=True, instance_identifier="name")
+    @cached("/tmp/cache/historical_funding_rate", is_method=True)
     def historical_funding_rate(
         self,
         instType: Union[InstrumentType, str],
@@ -385,8 +391,10 @@ class ExchangeAPIBase(AbstractExchangeAPIBase):
         cache_kwargs={},
     ) -> pd.DataFrame:
         """Return historical funding rates for given instrument"""
-
-        limit = self._limit or 100
+        if callable(self._funding_rate_limit):
+            limit = self._funding_rate_limit(timedelta)
+        else:
+            limit = self._funding_rate_limit or 100
 
         _requests = []
 
@@ -422,7 +430,7 @@ class ExchangeAPIBase(AbstractExchangeAPIBase):
         cache_kwargs={},
     ) -> pd.DataFrame:
         _requests = []
-        limit = self._limit or 100
+        limit = self._ohlcv_limit or 100
         start_times, end_times, limits = self._ohlcv_get_request_intervals(starttime, endtime, timedelta, limit)
 
         for _starttime, _endtime, limit in zip(start_times, end_times, limits):

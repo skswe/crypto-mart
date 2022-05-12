@@ -34,7 +34,8 @@ class Kucoin(ExchangeAPIBase):
 
     _base_url = "https://api-futures.kucoin.com/api/v1"
     _max_requests_per_second = 10
-    _limit = 200
+    _ohlcv_limit = 200
+    _funding_rate_limit = 200
     _start_inclusive = True
     _end_inclusive = True
     _ohlcv_column_map = {

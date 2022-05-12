@@ -31,7 +31,8 @@ class OKEx(ExchangeAPIBase):
 
     _base_url = "https://www.okex.com/api/v5"
     _max_requests_per_second = 5
-    _limit = 1000
+    _ohlcv_limit = 1000
+    _funding_rate_limit = 1000
     _start_inclusive = False
     _end_inclusive = True
     _ohlcv_column_map = {

@@ -30,7 +30,8 @@ class BitMEX(ExchangeAPIBase):
 
     _base_url = "https://www.bitmex.com/api/v1"
     _max_requests_per_second = 0.5
-    _limit = 1000
+    _ohlcv_limit = 1000
+    _funding_rate_limit = 1000
     _start_inclusive = True
     _end_inclusive = True
     _tolerance = "8h"

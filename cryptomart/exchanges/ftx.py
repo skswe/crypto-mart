@@ -29,7 +29,8 @@ class FTX(ExchangeAPIBase):
 
     _base_url = "https://ftx.com/api"
     _max_requests_per_second = 7
-    _limit = 150
+    _ohlcv_limit = 150
+    _funding_rate_limit = 200
     _start_inclusive = True
     _end_inclusive = True
     _tolerance = "8h"

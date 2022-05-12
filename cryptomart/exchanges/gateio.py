@@ -6,7 +6,7 @@ import pandas as pd
 from pyutil.cache import cached
 from requests import Request, get
 
-from ..enums import Interval, OrderBookSchema, OrderBookSide,FundingRateSchema
+from ..enums import Interval, OrderBookSchema, OrderBookSide, FundingRateSchema
 from ..feeds import OHLCVColumn
 from .base import ExchangeAPIBase
 from .instrument_names.gateio import instrument_names as gateio_instrument_names
@@ -32,7 +32,8 @@ class GateIO(ExchangeAPIBase):
 
     _base_url = "https://api.gateio.ws/api/v4"
     _max_requests_per_second = 100
-    _limit = 200
+    _ohlcv_limit = 200
+    _funding_rate_limit = 200
     _start_inclusive = True
     _end_inclusive = True
     _ohlcv_column_map = {
@@ -43,10 +44,7 @@ class GateIO(ExchangeAPIBase):
         "c": OHLCVColumn.close,
         "v": OHLCVColumn.volume,
     }
-    _funding_rate_column_map = {
-        "t": FundingRateSchema.timestamp,
-        "r": FundingRateSchema.funding_rate 
-    }
+    _funding_rate_column_map = {"t": FundingRateSchema.timestamp, "r": FundingRateSchema.funding_rate}
 
     def _ohlcv_prepare_request(self, symbol, instType, interval, starttime, endtime, limit):
         url = "futures/usdt/candlesticks"
@@ -115,16 +113,16 @@ class GateIO(ExchangeAPIBase):
 
     def _histrorical_funding_rate_prepare_request(self, instType, symbol, starttime, endtime, limit):
         url = "futures/usdt/funding_rate"
-        request_url = os.path.join(self._base_url,url)
+        request_url = os.path.join(self._base_url, url)
         print(request_url)
         return Request(
-                "GET",
-                request_url,
-                params= {
-            "contract": symbol,
-        },
+            "GET",
+            request_url,
+            params={
+                "contract": symbol,
+            },
         )
-    
+
     def _histrorical_funding_rate_extract_response(self, response):
         if isinstance(response, list) and "code" in response:
             # Error has occured
@@ -133,7 +131,7 @@ class GateIO(ExchangeAPIBase):
             # TODO: build exception handling where reponse error can be fixed
             raise Exception(response["msg"])
         return response
-    
+
     @staticmethod
     def ET_to_datetime(et):
         # Convert exchange native time format to datetime

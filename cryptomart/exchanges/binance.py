@@ -36,7 +36,8 @@ class Binance(ExchangeAPIBase):
 
     _base_url = "https://fapi.binance.com/fapi/v1"
     _max_requests_per_second = 4
-    _limit = 1000
+    _ohlcv_limit = 1000
+    _funding_rate_limit = 100
     _start_inclusive = True
     _end_inclusive = True
     _tolerance = "8h"

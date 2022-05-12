@@ -35,7 +35,8 @@ class Bybit(ExchangeAPIBase):
 
     _base_url = "https://api.bybit.com"
     _max_requests_per_second = 40
-    _limit = 200
+    _ohlcv_limit = 200
+    _funding_rate_limit = 200
     _start_inclusive = True
     _end_inclusive = False
 
