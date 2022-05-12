@@ -379,7 +379,7 @@ class ExchangeAPIBase(AbstractExchangeAPIBase):
 
         return OHLCVFeed(df, self.name, symbol, instType, interval, starttime, endtime)
 
-    @cached("/tmp/cache/historical_funding_rate", is_method=True)
+    @cached("/tmp/cache/historical_funding_rate", is_method=True, instance_identifier="name")
     def historical_funding_rate(
         self,
         instType: Union[InstrumentType, str],
