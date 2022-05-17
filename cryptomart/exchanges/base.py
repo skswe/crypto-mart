@@ -12,8 +12,16 @@ from pyutil.cache import cached
 from pyutil.dicts import stack_dict
 from requests import Request
 
-from ..enums import (FundingRateSchema, Instrument, InstrumentType, Interval,
-                     OHLCVColumn, OrderBookSchema, OrderBookSide, Symbol)
+from ..enums import (
+    FundingRateSchema,
+    Instrument,
+    InstrumentType,
+    Interval,
+    OHLCVColumn,
+    OrderBookSchema,
+    OrderBookSide,
+    Symbol,
+)
 from ..feeds import OHLCVFeed
 from ..globals import EARLIEST_OHLCV_DATE, END_OHLCV_DATE, INVALID_DATE
 from ..util import Dispatcher
@@ -99,12 +107,6 @@ class AbstractExchangeAPIBase(ABC):
     @property
     @abstractmethod
     def _end_inclusive() -> bool:
-        """The last open_time returned will match endtime parameter"""
-        pass
-
-    @property
-    @abstractmethod
-    def _tolerance() -> datetime.timedelta:
         """The last open_time returned will match endtime parameter"""
         pass
 
@@ -378,7 +380,7 @@ class ExchangeAPIBase(AbstractExchangeAPIBase):
         instType: InstrumentType,
         starttime: datetime.datetime,
         endtime: datetime.datetime,
-        timedelta: datetime.timedelta,     
+        timedelta: datetime.timedelta,
         cache_kwargs={},
     ) -> pd.DataFrame:
         """Return historical funding rates for given instrument"""
@@ -655,7 +657,6 @@ class ExchangeAPIBase(AbstractExchangeAPIBase):
         ohlcvDf.sort_values("open_time", inplace=True)
         fundingRateDf["open_time"] = fundingRateDf.index.values.astype("datetime64[s]")
         fundingRateDf.sort_values("open_time", inplace=True)
-        tolerance = self._tolerance or datetime.timedelta(hours=8)
 
         fundingRateDf.to_csv(r"./data/funding.txt", header=True, index=True, sep=" ", mode="w")
         pd.merge_asof(ohlcvDf, fundingRateDf, on="open_time", tolerance=pd.Timedelta("8h")).to_csv(
