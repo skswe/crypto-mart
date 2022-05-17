@@ -111,7 +111,7 @@ class GateIO(ExchangeAPIBase):
         res = get(request_url).json()
         return float(res["quanto_multiplier"])
 
-    def _histrorical_funding_rate_prepare_request(self, instType, symbol, starttime, endtime, limit):
+    def _historical_funding_rate_prepare_request(self, instType, symbol, starttime, endtime, limit):
         url = "futures/usdt/funding_rate"
         request_url = os.path.join(self._base_url, url)
         print(request_url)
@@ -123,7 +123,7 @@ class GateIO(ExchangeAPIBase):
             },
         )
 
-    def _histrorical_funding_rate_extract_response(self, response):
+    def _historical_funding_rate_extract_response(self, response):
         if isinstance(response, list) and "code" in response:
             # Error has occured
 

@@ -125,7 +125,7 @@ class OKEx(ExchangeAPIBase):
         multiplier = int(res["data"][0]["ctVal"])
         return multiplier
 
-    def _histrorical_funding_rate_prepare_request(self, instType, symbol, starttime, endtime, limit):
+    def _historical_funding_rate_prepare_request(self, instType, symbol, starttime, endtime, limit):
         request_url = os.path.join(self._base_url, "public/funding-rate-history")
         print(request_url)
         params = {
@@ -141,7 +141,7 @@ class OKEx(ExchangeAPIBase):
             params=params,
         )
 
-    def _histrorical_funding_rate_extract_response(self, response):
+    def _historical_funding_rate_extract_response(self, response):
         # print(response)
         if int(response["code"]) != 0:
             # Error has occured

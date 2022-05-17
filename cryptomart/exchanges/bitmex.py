@@ -102,7 +102,7 @@ class BitMEX(ExchangeAPIBase):
     def _order_book_quantity_multiplier(self, symbol, instType, **kwargs):
         return 1
 
-    def _histrorical_funding_rate_prepare_request(self, instType, symbol, starttime, endtime, limit):
+    def _historical_funding_rate_prepare_request(self, instType, symbol, starttime, endtime, limit):
         request_url = os.path.join(self._base_url, "funding")
         print(self.ET_to_datetime(starttime))
         params = {
@@ -118,7 +118,7 @@ class BitMEX(ExchangeAPIBase):
             params=params,
         )
 
-    def _histrorical_funding_rate_extract_response(self, response):
+    def _historical_funding_rate_extract_response(self, response):
         if isinstance(response, list) and "code" in response:
             # Error has occured
 

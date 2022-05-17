@@ -142,12 +142,12 @@ class AbstractExchangeAPIBase(ABC):
         pass
 
     @abstractmethod
-    def _histrorical_funding_rate_prepare_request(self, instType, symbol, starttime, endtime, limit) -> Request:
+    def _historical_funding_rate_prepare_request(self, instType, symbol, starttime, endtime, limit) -> Request:
         """Function to set up API request"""
         pass
 
     @abstractmethod
-    def _histrorical_funding_rate_extract_response(self, response) -> Union[List, dict]:
+    def _historical_funding_rate_extract_response(self, response) -> Union[List, dict]:
         """Function to extract data from API http response"""
         pass
 
@@ -400,14 +400,14 @@ class ExchangeAPIBase(AbstractExchangeAPIBase):
 
         start_times, end_times, limits = self._ohlcv_get_request_intervals(starttime, endtime, timedelta, limit)
         for _starttime, _endtime, limit in zip(start_times, end_times, limits):
-            request = self._histrorical_funding_rate_prepare_request(instType, symbol, _starttime, _endtime, limit)
+            request = self._historical_funding_rate_prepare_request(instType, symbol, _starttime, _endtime, limit)
             print(_endtime)
             _requests.append(request)
 
         response = []
         for request in _requests:
             res = self.dispatcher.send_request(request)
-            res = self._histrorical_funding_rate_extract_response(res)
+            res = self._historical_funding_rate_extract_response(res)
             print(len(res))
             response.extend(res)
 

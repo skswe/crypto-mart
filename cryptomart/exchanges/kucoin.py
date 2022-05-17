@@ -107,7 +107,7 @@ class Kucoin(ExchangeAPIBase):
         res = get(request_url).json()
         return float(res["data"]["multiplier"])
 
-    def _histrorical_funding_rate_prepare_request(self, instType, symbol, starttime, endtime, limit):
+    def _historical_funding_rate_prepare_request(self, instType, symbol, starttime, endtime, limit):
         request_url = os.path.join(self._base_url, "funding-history")
         print(request_url)
         params = {
@@ -122,7 +122,7 @@ class Kucoin(ExchangeAPIBase):
             params=params,
         )
 
-    def _histrorical_funding_rate_extract_response(self, response):
+    def _historical_funding_rate_extract_response(self, response):
         print(response)
         if response["code"] != "200000":
             # Error has occured
