@@ -1,7 +1,6 @@
 import datetime
 import logging
 import os
-import math
 
 import pandas as pd
 from requests import Request
@@ -50,13 +49,12 @@ class CoinFLEX(ExchangeAPIBase):
         "fundingRate": FundingRateSchema.funding_rate,
     }
 
-    def _funding_rate_limit(timedelta: datetime.timedelta) -> int:
-        """Determine funding rate limit by returning the lesser of 7 days divided by timedelta of request or 500"""
+    def _funding_rate_limit(interval: datetime.timedelta) -> int:
+        """Returns exchange's funding rate record limit given interval of requsted records"""
 
-        if datetime.timedelta(days=7) / timedelta > 500:
-            return 500
-        else:
-            return math.floor(datetime.timedelta(days=7) / timedelta)
+        TIME_LIMIT = datetime.timedelta(days=7)
+        RECORD_LIMIT = 500
+        return min(RECORD_LIMIT, int(TIME_LIMIT / interval))
 
     def _ohlcv_prepare_request(self, symbol, instType, interval, starttime, endtime, limit):
         url = f"v2/candles/{symbol}"
