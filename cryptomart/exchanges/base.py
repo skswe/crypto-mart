@@ -394,14 +394,12 @@ class ExchangeAPIBase(AbstractExchangeAPIBase):
         start_times, end_times, limits = self._ohlcv_get_request_intervals(starttime, endtime, timedelta, limit)
         for _starttime, _endtime, limit in zip(start_times, end_times, limits):
             request = self._funding_rate_prepare_request(symbol_name, instType, _starttime, _endtime, limit)
-            print(_endtime)
             _requests.append(request)
 
         response = []
         for request in _requests:
             res = self.dispatcher.send_request(request)
             res = self._funding_rate_extract_response(res)
-            print(len(res))
             response.extend(res)
 
         df_funding = self._funding_rate_res_to_dataframe(response)
