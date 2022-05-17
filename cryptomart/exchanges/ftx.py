@@ -97,7 +97,7 @@ class FTX(ExchangeAPIBase):
     def _order_book_quantity_multiplier(self, symbol, instType, **kwargs):
         return 1
 
-    def _historical_funding_rate_prepare_request(self, instType, symbol, starttime, endtime, limit):
+    def _funding_rate_prepare_request(self, instType, symbol, starttime, endtime, limit):
         request_url = os.path.join(self._base_url, "funding_rates")
         # request_url = "https://ftx.com/api/funding_rates"
         print(self.ET_to_seconds(starttime))
@@ -112,7 +112,7 @@ class FTX(ExchangeAPIBase):
             },
         )
 
-    def _historical_funding_rate_extract_response(self, response):
+    def _funding_rate_extract_response(self, response):
         if response["success"] != True:
             # Error has occured
 

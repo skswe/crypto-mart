@@ -106,7 +106,7 @@ class Bybit(ExchangeAPIBase):
     def _order_book_quantity_multiplier(self, symbol, instType, **kwargs):
         return 1
 
-    def _historical_funding_rate_prepare_request(self, instType, symbol, starttime, endtime, limit):
+    def _funding_rate_prepare_request(self, instType, symbol, starttime, endtime, limit):
         request_url = os.path.join(self._base_url, "v2/public/funding/prev-funding-rate")
 
         return Request(
@@ -117,7 +117,7 @@ class Bybit(ExchangeAPIBase):
             },
         )
 
-    def _historical_funding_rate_extract_response(self, response):
+    def _funding_rate_extract_response(self, response):
         if response["ret_msg"] != "OK":
             # Error has occured
 

@@ -12,16 +12,8 @@ from pyutil.cache import cached
 from pyutil.dicts import stack_dict
 from requests import Request
 
-from ..enums import (
-    FundingRateSchema,
-    Instrument,
-    InstrumentType,
-    Interval,
-    OHLCVColumn,
-    OrderBookSchema,
-    OrderBookSide,
-    Symbol,
-)
+from ..enums import (FundingRateSchema, Instrument, InstrumentType, Interval,
+                     OHLCVColumn, OrderBookSchema, OrderBookSide, Symbol)
 from ..feeds import OHLCVFeed
 from ..globals import EARLIEST_OHLCV_DATE, END_OHLCV_DATE, INVALID_DATE
 from ..util import Dispatcher
@@ -142,12 +134,12 @@ class AbstractExchangeAPIBase(ABC):
         pass
 
     @abstractmethod
-    def _historical_funding_rate_prepare_request(self, symbol, instType, starttime, endtime, limit) -> Request:
+    def _funding_rate_prepare_request(self, symbol, instType, starttime, endtime, limit) -> Request:
         """Function to set up API request"""
         pass
 
     @abstractmethod
-    def _historical_funding_rate_extract_response(self, response) -> Union[List, dict]:
+    def _funding_rate_extract_response(self, response) -> Union[List, dict]:
         """Function to extract data from API http response"""
         pass
 
@@ -358,7 +350,7 @@ class ExchangeAPIBase(AbstractExchangeAPIBase):
         )
 
         if include_funding_rate:
-            funding_df = self.historical_funding_rate(
+            funding_df = self._funding_rate(
                 symbol_name,
                 instType,
                 starttime,
@@ -380,14 +372,13 @@ class ExchangeAPIBase(AbstractExchangeAPIBase):
         return OHLCVFeed(df, self.name, symbol, instType, interval, starttime, endtime)
 
     @cached("/tmp/cache/historical_funding_rate", is_method=True, instance_identifier="name")
-    def historical_funding_rate(
+    def _funding_rate(
         self,
-        symbol: Union[Symbol, str],
-        instType: Union[InstrumentType, str],
+        symbol_name: str,
+        instType: InstrumentType,
         starttime: datetime.datetime,
         endtime: datetime.datetime,
-        timedelta: datetime.timedelta,
-        limit: int = None,
+        timedelta: datetime.timedelta,     
         cache_kwargs={},
     ) -> pd.DataFrame:
         """Return historical funding rates for given instrument"""
@@ -400,14 +391,14 @@ class ExchangeAPIBase(AbstractExchangeAPIBase):
 
         start_times, end_times, limits = self._ohlcv_get_request_intervals(starttime, endtime, timedelta, limit)
         for _starttime, _endtime, limit in zip(start_times, end_times, limits):
-            request = self._historical_funding_rate_prepare_request(symbol, instType, _starttime, _endtime, limit)
+            request = self._funding_rate_prepare_request(symbol_name, instType, _starttime, _endtime, limit)
             print(_endtime)
             _requests.append(request)
 
         response = []
         for request in _requests:
             res = self.dispatcher.send_request(request)
-            res = self._historical_funding_rate_extract_response(res)
+            res = self._funding_rate_extract_response(res)
             print(len(res))
             response.extend(res)
 
@@ -418,7 +409,7 @@ class ExchangeAPIBase(AbstractExchangeAPIBase):
     @cached("/tmp/cache/ohlcv", is_method=True, instance_identifiers=["name"])
     def _ohlcv(
         self,
-        symbol: str,
+        symbol_name: Symbol,
         instType: InstrumentType,
         interval: Union[str, int],
         starttime: datetime.datetime,
@@ -434,7 +425,7 @@ class ExchangeAPIBase(AbstractExchangeAPIBase):
         start_times, end_times, limits = self._ohlcv_get_request_intervals(starttime, endtime, timedelta, limit)
 
         for _starttime, _endtime, limit in zip(start_times, end_times, limits):
-            request = self._ohlcv_prepare_request(symbol, instType, interval, _starttime, _endtime, limit)
+            request = self._ohlcv_prepare_request(symbol_name, instType, interval, _starttime, _endtime, limit)
             _requests.append(request)
 
         expected_datapoints = sum(limits)
