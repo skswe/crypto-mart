@@ -142,7 +142,7 @@ class AbstractExchangeAPIBase(ABC):
         pass
 
     @abstractmethod
-    def _historical_funding_rate_prepare_request(self, instType, symbol, starttime, endtime, limit) -> Request:
+    def _historical_funding_rate_prepare_request(self, symbol, instType, starttime, endtime, limit) -> Request:
         """Function to set up API request"""
         pass
 
@@ -359,8 +359,8 @@ class ExchangeAPIBase(AbstractExchangeAPIBase):
 
         if include_funding_rate:
             funding_df = self.historical_funding_rate(
-                instType,
                 symbol_name,
+                instType,
                 starttime,
                 endtime,
                 timedelta,
@@ -382,8 +382,8 @@ class ExchangeAPIBase(AbstractExchangeAPIBase):
     @cached("/tmp/cache/historical_funding_rate", is_method=True, instance_identifier="name")
     def historical_funding_rate(
         self,
-        instType: Union[InstrumentType, str],
         symbol: Union[Symbol, str],
+        instType: Union[InstrumentType, str],
         starttime: datetime.datetime,
         endtime: datetime.datetime,
         timedelta: datetime.timedelta,
@@ -400,7 +400,7 @@ class ExchangeAPIBase(AbstractExchangeAPIBase):
 
         start_times, end_times, limits = self._ohlcv_get_request_intervals(starttime, endtime, timedelta, limit)
         for _starttime, _endtime, limit in zip(start_times, end_times, limits):
-            request = self._historical_funding_rate_prepare_request(instType, symbol, _starttime, _endtime, limit)
+            request = self._historical_funding_rate_prepare_request(symbol, instType, _starttime, _endtime, limit)
             print(_endtime)
             _requests.append(request)
 
