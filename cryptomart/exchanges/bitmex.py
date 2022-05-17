@@ -102,7 +102,7 @@ class BitMEX(ExchangeAPIBase):
     def _order_book_quantity_multiplier(self, symbol, instType, **kwargs):
         return 1
 
-    def _funding_rate_prepare_request(self, instType, symbol, starttime, endtime, limit):
+    def _funding_rate_prepare_request(self, symbol, instType, starttime, endtime, limit):
         request_url = os.path.join(self._base_url, "funding")
         print(self.ET_to_datetime(starttime))
         params = {

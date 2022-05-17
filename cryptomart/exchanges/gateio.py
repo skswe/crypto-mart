@@ -111,7 +111,7 @@ class GateIO(ExchangeAPIBase):
         res = get(request_url).json()
         return float(res["quanto_multiplier"])
 
-    def _funding_rate_prepare_request(self, instType, symbol, starttime, endtime, limit):
+    def _funding_rate_prepare_request(self, symbol, instType, starttime, endtime, limit):
         url = "futures/usdt/funding_rate"
         request_url = os.path.join(self._base_url, url)
         print(request_url)

@@ -125,7 +125,7 @@ class OKEx(ExchangeAPIBase):
         multiplier = int(res["data"][0]["ctVal"])
         return multiplier
 
-    def _funding_rate_prepare_request(self, instType, symbol, starttime, endtime, limit):
+    def _funding_rate_prepare_request(self, symbol, instType, starttime, endtime, limit):
         request_url = os.path.join(self._base_url, "public/funding-rate-history")
         print(request_url)
         params = {

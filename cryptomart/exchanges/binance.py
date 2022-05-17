@@ -5,10 +5,12 @@ import os
 import pandas as pd
 from requests import Request
 
-from ..enums import FundingRateSchema, InstrumentType, Interval, OrderBookSchema, OrderBookSide
+from ..enums import (FundingRateSchema, InstrumentType, Interval,
+                     OrderBookSchema, OrderBookSide)
 from ..feeds import OHLCVColumn
 from .base import ExchangeAPIBase
-from .instrument_names.binance import instrument_names as binance_instrument_names
+from .instrument_names.binance import \
+    instrument_names as binance_instrument_names
 
 logger = logging.getLogger(__name__)
 
@@ -119,7 +121,7 @@ class Binance(ExchangeAPIBase):
     def _order_book_quantity_multiplier(self, symbol, instType, **kwargs):
         return 1
 
-    def _funding_rate_prepare_request(self, instType, symbol, starttime, endtime, limit):
+    def _funding_rate_prepare_request(self, symbol, instType, starttime, endtime, limit):
         request_url = os.path.join(self._base_url, "fundingRate")
         params = {
             "symbol": symbol,
