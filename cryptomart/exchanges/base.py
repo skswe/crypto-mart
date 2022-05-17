@@ -302,7 +302,7 @@ class ExchangeAPIBase(AbstractExchangeAPIBase):
         endtime: Union[
             datetime.datetime, Tuple[int]
         ] = None,  # endtime is the time that occurs immediately after the final close time
-        include_funding_rate: bool = True,
+        include_funding_rate: bool = False,
         disable_cache=False,
         refresh_cache=False,
     ) -> OHLCVFeed:
@@ -645,10 +645,6 @@ class ExchangeAPIBase(AbstractExchangeAPIBase):
             lambda e: self.ET_to_datetime(e)
         )
 
-        data = data.set_index(FundingRateSchema.timestamp)
-
-        # data[:, FundingRateSchema.funding_rate] = data[:, FundingRateSchema.funding_rate].astype(float)
-
         return data
 
     def _ohlcv_merge_funding_rate(self, ohlcvDf: pd.DataFrame, fundingRateDf: pd.DataFrame) -> pd.DataFrame:
@@ -656,10 +652,10 @@ class ExchangeAPIBase(AbstractExchangeAPIBase):
         fundingRateDf["open_time"] = fundingRateDf.index.values.astype("datetime64[s]")
         fundingRateDf.sort_values("open_time", inplace=True)
 
-        fundingRateDf.to_csv(r"./data/funding.txt", header=True, index=True, sep=" ", mode="w")
-        pd.merge_asof(ohlcvDf, fundingRateDf, on="open_time", tolerance=pd.Timedelta("8h")).to_csv(
-            r"./data/Mergeddataframe2.txt", header=True, index=True, sep=" ", mode="w"
-        )
+        # fundingRateDf.to_csv(r"./data/funding.txt", header=True, index=True, sep=" ", mode="w")
+        # pd.merge_asof(ohlcvDf, fundingRateDf, on="open_time", tolerance=pd.Timedelta("8h")).to_csv(
+        #     r"./data/Mergeddataframe2.txt", header=True, index=True, sep=" ", mode="w"
+        # )
         return pd.merge_asof(ohlcvDf, fundingRateDf, on="open_time", allow_exact_matches=False)  # direction="forward"
         # , tolerance=tolerance
 
