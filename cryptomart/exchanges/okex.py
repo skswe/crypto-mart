@@ -32,7 +32,7 @@ class OKEx(ExchangeAPIBase):
     _base_url = "https://www.okex.com/api/v5"
     _max_requests_per_second = 5
     _ohlcv_limit = 1000
-    _funding_rate_limit = 1000
+    _funding_rate_limit = 100
     _start_inclusive = False
     _end_inclusive = True
     _ohlcv_column_map = {
@@ -127,14 +127,14 @@ class OKEx(ExchangeAPIBase):
 
     def _funding_rate_prepare_request(self, symbol, instType, starttime, endtime, limit):
         request_url = os.path.join(self._base_url, "public/funding-rate-history")
-        print(request_url)
+        
         params = {
             "instId": symbol,
             "before": starttime,
             "after": endtime,
             "limit": limit,
         }
-
+        print(params)
         return Request(
             "GET",
             request_url,
