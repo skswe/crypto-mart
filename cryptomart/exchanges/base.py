@@ -210,6 +210,9 @@ class ExchangeAPIBase(AbstractExchangeAPIBase):
 
         self.active_instruments = load_active_instruments()
 
+    _funding_rate_interval = datetime.timedelta(hours=8)
+    """The interval at which the funding rate is updated"""
+
     @property
     def log_level(self):
         return logger.level
@@ -391,7 +394,9 @@ class ExchangeAPIBase(AbstractExchangeAPIBase):
 
         _requests = []
 
-        start_times, end_times, limits = self._ohlcv_get_request_intervals(starttime, endtime, timedelta, limit)
+        # api_timedelta is the effective timedelta (interval) of the funding rate data provided by the api
+        api_timedelta = self._funding_rate_interval
+        start_times, end_times, limits = self._ohlcv_get_request_intervals(starttime, endtime, api_timedelta, limit)
         for _starttime, _endtime, limit in zip(start_times, end_times, limits):
             request = self._funding_rate_prepare_request(symbol_name, instType, _starttime, _endtime, limit)
             _requests.append(request)
@@ -653,7 +658,7 @@ class ExchangeAPIBase(AbstractExchangeAPIBase):
         )
 
         data[FundingRateSchema.funding_rate] = data[FundingRateSchema.funding_rate].astype(float)
-        print(data)
+        
         # Resamples according to timedelta, picking the median funding rate within each time bucket
         data = data.resample(timedelta, on=FundingRateSchema.timestamp).median()
 
