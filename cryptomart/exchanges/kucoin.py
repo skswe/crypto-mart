@@ -109,13 +109,13 @@ class Kucoin(ExchangeAPIBase):
 
     def _funding_rate_prepare_request(self, symbol, instType, starttime, endtime, limit):
         request_url = os.path.join(self._base_url, "funding-history")
-        print(request_url)
+        
         params = {
             "symbol": "XBTUSDM",
             # "startAt": starttime,
             # "endAt": endtime,
         }
-        print(params)
+
         return Request(
             "GET",
             request_url,
@@ -123,7 +123,6 @@ class Kucoin(ExchangeAPIBase):
         )
 
     def _funding_rate_extract_response(self, response):
-        print(response)
         if response["code"] != "200000":
             # Error has occured
 

@@ -104,7 +104,7 @@ class BitMEX(ExchangeAPIBase):
 
     def _funding_rate_prepare_request(self, symbol, instType, starttime, endtime, limit):
         request_url = os.path.join(self._base_url, "funding")
-        print(self.ET_to_datetime(starttime))
+        
         params = {
             "symbol": symbol,
             "startTime": self.ET_to_datetime(starttime),

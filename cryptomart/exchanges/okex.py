@@ -134,7 +134,7 @@ class OKEx(ExchangeAPIBase):
             "after": endtime,
             "limit": limit,
         }
-        print(params)
+        
         return Request(
             "GET",
             request_url,
@@ -142,7 +142,6 @@ class OKEx(ExchangeAPIBase):
         )
 
     def _funding_rate_extract_response(self, response):
-        # print(response)
         if int(response["code"]) != 0:
             # Error has occured
 
