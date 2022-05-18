@@ -32,33 +32,40 @@ class CoinFLEX(ExchangeAPIBase):
 
     _base_url = "https://v2api.coinflex.com"
     _max_requests_per_second = 20
-    _ohlcv_limit = 6
     _start_inclusive = True
     _end_inclusive = True
     _tolerance = datetime.timedelta(hours=1)
     _ohlcv_column_map = {
-        "timestamp": OHLCVColumn.open_time,
+        "openedAt": OHLCVColumn.open_time,
         "open": OHLCVColumn.open,
         "high": OHLCVColumn.high,
         "low": OHLCVColumn.low,
         "close": OHLCVColumn.close,
-        "volume24h": OHLCVColumn.volume,
+        "volume": OHLCVColumn.volume,
     }
     _funding_rate_column_map = {
         "createdAt": FundingRateSchema.timestamp,
         "fundingRate": FundingRateSchema.funding_rate,
     }
 
-    def _funding_rate_limit(interval: datetime.timedelta) -> int:
+    def _funding_rate_limit(self, interval: datetime.timedelta) -> int:
         """Returns exchange's funding rate record limit given interval of requsted records"""
 
         TIME_LIMIT = datetime.timedelta(days=7)
         RECORD_LIMIT = 500
         return min(RECORD_LIMIT, int(TIME_LIMIT / interval))
 
+    def _ohlcv_limit(self, interval: datetime.timedelta) -> int:
+        """Returns exchange's funding rate record limit given interval of requsted records"""
+
+        TIME_LIMIT = datetime.timedelta(days=7)
+        RECORD_LIMIT = 5000
+        return min(RECORD_LIMIT, int(TIME_LIMIT / interval))
+
     def _ohlcv_prepare_request(self, symbol, instType, interval, starttime, endtime, limit):
-        url = f"v2/candles/{symbol}"
+        url = f"v3/candles"
         params = {
+            "marketCode": symbol,
             "timeframe": interval,
             "limit": limit,
             "startTime": starttime,
@@ -68,14 +75,11 @@ class CoinFLEX(ExchangeAPIBase):
         return Request("GET", request_url, params=params)
 
     def _ohlcv_extract_response(self, response):
-        if len(response["data"]) == 0:
-            # Error has occured
-            # Raise general exception for now
+        if "error" in response:
             # TODO: build exception handling where reponse error can be fixed
-            raise Exception("No data found for these parameters")
-        elif "success" in response and response["success"] == False:
             raise Exception(response["message"])
-        return response["data"]
+        else:
+            return response["data"]
 
     def _order_book_prepare_request(self, symbol, instType, depth=50):
         request_url = os.path.join(self._base_url, f"v2/depth/{symbol}/{depth}")

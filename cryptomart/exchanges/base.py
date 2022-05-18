@@ -421,7 +421,11 @@ class ExchangeAPIBase(AbstractExchangeAPIBase):
         cache_kwargs={},
     ) -> pd.DataFrame:
         _requests = []
-        limit = self._ohlcv_limit or 100
+        if callable(self._ohlcv_limit):
+            limit = self._ohlcv_limit(timedelta)
+        else:
+            limit = self._ohlcv_limit or 100
+            
         start_times, end_times, limits = self._ohlcv_get_request_intervals(starttime, endtime, timedelta, limit)
 
         for _starttime, _endtime, limit in zip(start_times, end_times, limits):
