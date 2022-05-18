@@ -402,7 +402,7 @@ class ExchangeAPIBase(AbstractExchangeAPIBase):
             res = self._funding_rate_extract_response(res)
             response.extend(res)
 
-        df_funding = self._funding_rate_res_to_dataframe(response)
+        df_funding = self._funding_rate_res_to_dataframe(response, starttime, endtime, timedelta)
 
         return df_funding
 
@@ -628,7 +628,10 @@ class ExchangeAPIBase(AbstractExchangeAPIBase):
 
     def _funding_rate_res_to_dataframe(
         self,
-        data: Union[Union[dict, list], pd.DataFrame],
+        data: Union[List[Union[dict, list]], pd.DataFrame],
+        starttime: datetime.datetime,
+        endtime: datetime.datetime,
+        timedelta: datetime.timedelta,
     ) -> pd.DataFrame:
 
         if isinstance(data, pd.DataFrame):
@@ -644,6 +647,16 @@ class ExchangeAPIBase(AbstractExchangeAPIBase):
         data.loc[:, FundingRateSchema.timestamp] = data.loc[:, FundingRateSchema.timestamp].apply(
             lambda e: self.ET_to_datetime(e)
         )
+
+        data[FundingRateSchema.funding_rate] = data[FundingRateSchema.funding_rate].astype(float)
+        print(data)
+        # Resamples according to timedelta, picking the median funding rate within each time bucket
+        data = data.resample(timedelta, on=FundingRateSchema.timestamp).median()
+
+        expected_index = pd.period_range(starttime, endtime, freq=timedelta, name=FundingRateSchema.timestamp)[
+            :-1
+        ].to_timestamp()
+        data = data.reindex(expected_index).reset_index()
 
         return data
 
