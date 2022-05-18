@@ -29,11 +29,11 @@ class FTX(ExchangeAPIBase):
 
     _base_url = "https://ftx.com/api"
     _max_requests_per_second = 7
-    _ohlcv_limit = 150
+    _ohlcv_limit = 1500
     _funding_rate_limit = 200
+    _funding_rate_interval = datetime.timedelta(hours=1)
     _start_inclusive = True
     _end_inclusive = True
-    _tolerance = "8h"
     _ohlcv_column_map = {
         "startTime": OHLCVColumn.open_time,
         "open": OHLCVColumn.open,
@@ -99,9 +99,7 @@ class FTX(ExchangeAPIBase):
 
     def _funding_rate_prepare_request(self, symbol, instType, starttime, endtime, limit):
         request_url = os.path.join(self._base_url, "funding_rates")
-        # request_url = "https://ftx.com/api/funding_rates"
-        print(self.ET_to_seconds(starttime))
-        print(self.ET_to_seconds(endtime))
+
         return Request(
             "GET",
             request_url,
