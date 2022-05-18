@@ -117,9 +117,6 @@ class CoinFLEX(ExchangeAPIBase):
             # "limit": limit,
         }
 
-        print(request_url)
-        print(params)
-
         return Request(
             "GET",
             request_url,
@@ -127,19 +124,10 @@ class CoinFLEX(ExchangeAPIBase):
         )
 
     def _funding_rate_extract_response(self, response):
-
-        if response["success"] == False and response["message"] == "no result, please check your parameters":
-            # Error has occured
-            # Raise general exception for now
+        if not response["success"]:
             # TODO: build exception handling where reponse error can be fixed
-            # raise Exception("No data found for these parameters")
-            response["data"] = []
-        elif (
-            response["success"] == False
-            and response["message"] == "startTime and endTime must be within 7 days of each other"
-        ):
             raise Exception(response["message"])
-        return response["data"]
-
+        else:
+            return response["data"]
 
 _exchange_export = CoinFLEX
