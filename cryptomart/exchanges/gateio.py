@@ -6,7 +6,7 @@ import pandas as pd
 from pyutil.cache import cached
 from requests import Request, get
 
-from ..enums import Interval, OrderBookSchema, OrderBookSide, FundingRateSchema
+from ..enums import FundingRateSchema, Interval, OrderBookSchema, OrderBookSide
 from ..feeds import OHLCVColumn
 from .base import ExchangeAPIBase
 from .instrument_names.gateio import instrument_names as gateio_instrument_names
@@ -114,7 +114,7 @@ class GateIO(ExchangeAPIBase):
     def _funding_rate_prepare_request(self, symbol, instType, starttime, endtime, limit):
         url = "futures/usdt/funding_rate"
         request_url = os.path.join(self._base_url, url)
-        print(request_url)
+
         return Request(
             "GET",
             request_url,
