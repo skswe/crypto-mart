@@ -665,7 +665,19 @@ class ExchangeAPIBase(AbstractExchangeAPIBase):
         expected_index = pd.period_range(starttime, endtime, freq=timedelta, name=FundingRateSchema.timestamp)[
             :-1
         ].to_timestamp()
+        
         data = data.reindex(expected_index).reset_index()
+        
+        
+        rows_per_datapoint = self._funding_rate_interval / timedelta
+        # Only fill up to 8 datapoints from the funding rate API
+        nan_threshold = int(rows_per_datapoint * 5)
+        
+        data = data.ffill(limit=nan_threshold).bfill(limit=nan_threshold)
+        
+        na_rows = data[FundingRateSchema.funding_rate].isna().sum() 
+        if na_rows > 0:
+            logger.warning(f"Funding rate missing {na_rows} rows ({na_rows / len(data)}%)")
 
         return data
 
