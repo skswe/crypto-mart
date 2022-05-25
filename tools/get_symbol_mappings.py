@@ -138,6 +138,7 @@ class FTX(exchanges.FTX):
         data = data[data.enabled]
         data = data[data.type == type_filter]
         data = data[~data.isEtfMarket]
+        data = data[~data.restricted]
 
         if instType == InstrumentType.PERPETUAL:
             data = data[data.name.apply(lambda e: e.endswith("PERP"))]
