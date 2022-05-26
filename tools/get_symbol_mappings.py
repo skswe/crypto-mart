@@ -30,7 +30,8 @@ class Binance(exchanges.Binance):
 
     def get_mappings(self, instType):
         base_url = self._base_url if instType == InstrumentType.SPOT else self._futures_base_url
-        url = os.path.join(base_url, "exchangeInfo")
+        suburl = "api/v3/exchangeInfo" if instType == InstrumentType.SPOT else "fapi/v1/exchangeInfo"
+        url = os.path.join(base_url, suburl)
         quote_assets = self.ACCEPTED_QUOTE_ASSETS[instType]
 
         res = requests.get(url)
@@ -149,6 +150,57 @@ class FTX(exchanges.FTX):
 
         data["exchange_symbol"] = data["name"]
 
+        return format_df(data)
+
+
+class GateIO(exchanges.GateIO):
+    ACCEPTED_QUOTE_ASSETS = {InstrumentType.PERPETUAL: ["USDT"], InstrumentType.SPOT: ["USDT"]}
+
+    def get_mappings(self, instType):
+        base_url = self._base_url
+        suburl = "spot/currency_pairs" if instType == InstrumentType.SPOT else "futures/usdt/contracts"
+        url = os.path.join(base_url, suburl)
+        quote_assets = self.ACCEPTED_QUOTE_ASSETS[instType]
+
+        res = requests.get(url)
+        data = pd.DataFrame(res.json())
+
+        if instType == InstrumentType.PERPETUAL:
+            data = data[data.in_delisting == False]
+            data = data[data.type == "direct"]
+            data["cryptomart_symbol"] = data.name.apply(lambda e: e.replace(f"_{quote_assets[0]}", ""))
+            data["exchange_symbol"] = data["name"]
+        elif instType == InstrumentType.SPOT:
+            data = data[data.trade_status == "tradable"]
+            data = data[data.quote.isin(quote_assets)]
+            data["cryptomart_symbol"] = data["base"]
+            data["exchange_symbol"] = data["id"]
+
+        return format_df(data)
+
+class Kucoin(exchanges.Kucoin):
+    ACCEPTED_QUOTE_ASSETS = {InstrumentType.PERPETUAL: ["USDT"], InstrumentType.SPOT: ["USDT"]}
+
+    def get_mappings(self, instType):
+        base_url = self._base_url if instType == InstrumentType.SPOT else self._futures_base_url
+        suburl = "api/v1/symbols" if instType == InstrumentType.SPOT else "api/v1/contracts/active"
+        url = os.path.join(base_url, suburl)
+        quote_assets = self.ACCEPTED_QUOTE_ASSETS[instType]
+
+        res = requests.get(url)
+        data = pd.DataFrame(res.json()["data"])
+
+        data = data[data.quoteCurrency.isin(quote_assets)]
+
+        if instType == InstrumentType.PERPETUAL:
+            data = data[data.status == "Open"]
+            data = data[data.isInverse == False]
+        elif instType == InstrumentType.SPOT:
+            data = data[data.enableTrading == True]
+
+        data["cryptomart_symbol"] = data["baseCurrency"]
+        data["exchange_symbol"] = data["symbol"]
+        
         return format_df(data)
 
 
