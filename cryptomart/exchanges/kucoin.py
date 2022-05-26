@@ -6,7 +6,7 @@ import pandas as pd
 from pyutil.cache import cached
 from requests import Request, get
 
-from ..enums import Interval, OrderBookSchema, OrderBookSide
+from ..enums import InstrumentType, Interval, OrderBookSchema, OrderBookSide
 from ..feeds import OHLCVColumn
 from .base import ExchangeAPIBase
 from .instrument_names.kucoin import instrument_names as kucoin_instrument_names
@@ -32,7 +32,8 @@ class Kucoin(ExchangeAPIBase):
         Interval.interval_1d: (1440, datetime.timedelta(days=1)),
     }
 
-    _base_url = "https://api-futures.kucoin.com/api/v1"
+    _futures_base_url = "https://api-futures.kucoin.com"
+    _base_url = "https://api.kucoin.com"
     _max_requests_per_second = 10
     _limit = 200
     _start_inclusive = True
@@ -47,14 +48,16 @@ class Kucoin(ExchangeAPIBase):
     }
 
     def _ohlcv_prepare_request(self, symbol, instType, interval, starttime, endtime, limit):
-        url = "kline/query"
+        if instType == InstrumentType.PERPETUAL:
+            request_url = os.path.join(self._futures_base_url, "api/v1/kline/query")
+
         params = {
             "symbol": symbol,
             "granularity": interval,
             "from": starttime,
             "to": endtime,
         }
-        request_url = os.path.join(self._base_url, url)
+
         return Request("GET", request_url, params=params)
 
     def _ohlcv_extract_response(self, response):
@@ -67,7 +70,8 @@ class Kucoin(ExchangeAPIBase):
         return response["data"]
 
     def _order_book_prepare_request(self, symbol, instType, depth):
-        request_url = os.path.join(self._base_url, "level2/depth100")
+        if instType == InstrumentType.PERPETUAL:
+            request_url = os.path.join(self._futures_base_url, "api/v1/level2/depth100")
 
         return Request(
             "GET",
@@ -98,7 +102,7 @@ class Kucoin(ExchangeAPIBase):
 
     @cached("/tmp/cache/order_book_multiplier", is_method=True, instance_identifiers=["name"], log_level="DEBUG")
     def _order_book_quantity_multiplier(self, symbol, instType, **kwargs):
-        request_url = os.path.join(self._base_url, f"contracts/{symbol}")
+        request_url = os.path.join(self._base_url, f"api/v1/contracts/{symbol}")
         res = get(request_url).json()
         return float(res["data"]["multiplier"])
 

@@ -178,6 +178,7 @@ class GateIO(exchanges.GateIO):
 
         return format_df(data)
 
+
 class Kucoin(exchanges.Kucoin):
     ACCEPTED_QUOTE_ASSETS = {InstrumentType.PERPETUAL: ["USDT"], InstrumentType.SPOT: ["USDT"]}
 
@@ -200,7 +201,7 @@ class Kucoin(exchanges.Kucoin):
 
         data["cryptomart_symbol"] = data["baseCurrency"]
         data["exchange_symbol"] = data["symbol"]
-        
+
         return format_df(data)
 
 

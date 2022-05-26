@@ -34,7 +34,8 @@ class Binance(ExchangeAPIBase):
         Interval.interval_1d: ("1d", datetime.timedelta(days=1)),
     }
 
-    _base_url = "https://fapi.binance.com/fapi/v1"
+    _base_url = "https://api.binance.com"
+    _futures_base_url = "https://fapi.binance.com"
     _max_requests_per_second = 4
     _limit = 1500
     _start_inclusive = True
@@ -50,7 +51,7 @@ class Binance(ExchangeAPIBase):
 
     def _ohlcv_prepare_request(self, symbol, instType, interval, starttime, endtime, limit):
         if instType == InstrumentType.PERPETUAL:
-            url = "klines"
+            request_url = os.path.join(self._futures_base_url, "fapi/v1/klines")
             params = {
                 "symbol": symbol,
                 "interval": interval,
@@ -59,7 +60,7 @@ class Binance(ExchangeAPIBase):
                 "limit": limit,
             }
         elif instType == InstrumentType.QUARTERLY:
-            url = "continuousKlines"
+            request_url = os.path.join(self._futures_base_url, "fapi/v1/continuousKlines")
             params = {
                 "pair": symbol,
                 "contractType": "CURRENT_QUARTER",
@@ -69,7 +70,6 @@ class Binance(ExchangeAPIBase):
                 "limit": limit,
             }
 
-        request_url = os.path.join(self._base_url, url)
         return Request("GET", request_url, params=params)
 
     def _ohlcv_extract_response(self, response):
@@ -82,7 +82,8 @@ class Binance(ExchangeAPIBase):
         return response
 
     def _order_book_prepare_request(self, symbol, instType, depth=50):
-        request_url = os.path.join(self._base_url, "depth")
+        if instType == InstrumentType.PERPETUAL:
+            request_url = os.path.join(self._futures_base_url, "fapi/v1/depth")
 
         return Request(
             "GET",

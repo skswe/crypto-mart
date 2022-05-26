@@ -68,9 +68,14 @@ class CoinFLEX(ExchangeAPIBase):
         return response["data"]
 
     def _order_book_prepare_request(self, symbol, instType, depth=50):
-        request_url = os.path.join(self._base_url, f"v2/depth/{symbol}/{depth}")
+        request_url = os.path.join(self._base_url, f"v3/depth")
 
-        return Request("GET", request_url)
+        params = {
+            "marketCode": symbol,
+            "level": depth,
+        }
+
+        return Request("GET", request_url, params=params)
 
     def _order_book_extract_response(self, response):
         if len(response["data"]) == 0:
@@ -79,15 +84,15 @@ class CoinFLEX(ExchangeAPIBase):
             # Raise general exception for now
             # TODO: build exception handling where reponse error can be fixed
             raise Exception("No data found for these parameters")
-        response = response["data"][0]
-        bids = pd.DataFrame(response["bids"], columns=[OrderBookSchema.price, OrderBookSchema.quantity]).assign(
+        response = response["data"]
+        bids = pd.DataFrame(response["bids"], columns=[OrderBookSchema.price, OrderBookSchema.quantity, "null1", "null2"]).assign(
             **{OrderBookSchema.side: OrderBookSide.bid}
-        )
-        asks = pd.DataFrame(response["asks"], columns=[OrderBookSchema.price, OrderBookSchema.quantity]).assign(
+        ).drop(columns=["null1", "null2"])
+        asks = pd.DataFrame(response["asks"], columns=[OrderBookSchema.price, OrderBookSchema.quantity, "null1", "null2"]).assign(
             **{OrderBookSchema.side: OrderBookSide.ask}
-        )
+        ).drop(columns=["null1", "null2"])
         return bids.merge(asks, how="outer").assign(
-            **{OrderBookSchema.timestamp: self.ET_to_datetime(response["timestamp"]).replace(microsecond=0)}
+            **{OrderBookSchema.timestamp: self.ET_to_datetime(response["lastUpdatedAt"]).replace(microsecond=0)}
         )
 
     def _order_book_quantity_multiplier(self, symbol, instType, **kwargs):
