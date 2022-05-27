@@ -210,6 +210,9 @@ class ExchangeAPIBase(AbstractExchangeAPIBase):
 
         self.active_instruments = load_active_instruments()
 
+    _needs_auth_funding_rate = False
+    _needs_auth_ohlcv = False
+    _needs_auth_order_book = False
     _funding_rate_interval = datetime.timedelta(hours=8)
     """The interval at which the funding rate is updated"""
 
@@ -399,6 +402,8 @@ class ExchangeAPIBase(AbstractExchangeAPIBase):
         start_times, end_times, limits = self._ohlcv_get_request_intervals(starttime, endtime, api_timedelta, limit)
         for _starttime, _endtime, limit in zip(start_times, end_times, limits):
             request = self._funding_rate_prepare_request(symbol_name, instType, _starttime, _endtime, limit)
+            if self._needs_auth_funding_rate:
+                request = self._authenticate_request(request)
             _requests.append(request)
 
         response = []
@@ -430,7 +435,7 @@ class ExchangeAPIBase(AbstractExchangeAPIBase):
             limit = self._ohlcv_limit(timedelta)
         else:
             limit = self._ohlcv_limit or 100
-            
+
         start_times, end_times, limits = self._ohlcv_get_request_intervals(starttime, endtime, timedelta, limit)
 
         for _starttime, _endtime, limit in zip(start_times, end_times, limits):
@@ -642,7 +647,6 @@ class ExchangeAPIBase(AbstractExchangeAPIBase):
         endtime: datetime.datetime,
         timedelta: datetime.timedelta,
     ) -> pd.DataFrame:
-
         if isinstance(data, pd.DataFrame):
             # Response already formatted as dataframe
             pass
@@ -658,24 +662,23 @@ class ExchangeAPIBase(AbstractExchangeAPIBase):
         )
 
         data[FundingRateSchema.funding_rate] = data[FundingRateSchema.funding_rate].astype(float)
-        
+
         # Resamples according to timedelta, picking the median funding rate within each time bucket
         data = data.resample(timedelta, on=FundingRateSchema.timestamp).median()
 
         expected_index = pd.period_range(starttime, endtime, freq=timedelta, name=FundingRateSchema.timestamp)[
             :-1
         ].to_timestamp()
-        
+
         data = data.reindex(expected_index).reset_index()
-        
-        
+
         rows_per_datapoint = self._funding_rate_interval / timedelta
         # Only fill up to 8 datapoints from the funding rate API
-        nan_threshold = int(rows_per_datapoint * 5)
-        
+        nan_threshold = math.ceil(rows_per_datapoint * 5)
+
         data = data.ffill(limit=nan_threshold).bfill(limit=nan_threshold)
-        
-        na_rows = data[FundingRateSchema.funding_rate].isna().sum() 
+
+        na_rows = data[FundingRateSchema.funding_rate].isna().sum()
         if na_rows > 0:
             logger.warning(f"Funding rate missing {na_rows} rows ({na_rows / len(data)}%)")
 

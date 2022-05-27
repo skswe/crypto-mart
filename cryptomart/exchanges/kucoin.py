@@ -1,9 +1,14 @@
 import datetime
 import logging
 import os
+from dotenv import load_dotenv
 
 import pandas as pd
 from pyutil.cache import cached
+import time
+import base64
+import hmac
+import hashlib
 from requests import Request, get
 
 from ..enums import FundingRateSchema, Interval, OrderBookSchema, OrderBookSide
@@ -12,6 +17,7 @@ from .base import ExchangeAPIBase
 from .instrument_names.kucoin import instrument_names as kucoin_instrument_names
 
 logger = logging.getLogger(__name__)
+load_dotenv()
 
 
 class Kucoin(ExchangeAPIBase):
@@ -50,9 +56,33 @@ class Kucoin(ExchangeAPIBase):
         "timesPoint": FundingRateSchema.timestamp,
         "fundingRate": FundingRateSchema.funding_rate,
     }
+    _needs_auth_funding_rate = True
+
+    def _authenticate_request(self, request):
+        prepared_request = request.prepare()
+        API_KEY = os.environ["KUCOIN_API_KEY"]
+        API_SECRET = os.environ["KUCOIN_API_SECRET"]
+        API_PASSPHRASE = os.environ["KUCOIN_API_PASSPHRASE"]
+        now = int(time.time() * 1000)
+        str_to_sign = str(now) + prepared_request.method + prepared_request.path_url + (prepared_request.body or "")
+        signature = base64.b64encode(
+            hmac.new(API_SECRET.encode("utf-8"), str_to_sign.encode("utf-8"), hashlib.sha256).digest()
+        )
+        passphrase = base64.b64encode(
+            hmac.new(API_SECRET.encode("utf-8"), API_PASSPHRASE.encode("utf-8"), hashlib.sha256).digest()
+        )
+        request.headers = {
+            "KC-API-SIGN": signature,
+            "KC-API-TIMESTAMP": str(now),
+            "KC-API-KEY": API_KEY,
+            "KC-API-PASSPHRASE": passphrase,
+            "KC-API-KEY-VERSION": "2",
+        }
+        return request
 
     def _ohlcv_prepare_request(self, symbol, instType, interval, starttime, endtime, limit):
         url = "kline/query"
+
         params = {
             "symbol": symbol,
             "granularity": interval,
@@ -109,11 +139,11 @@ class Kucoin(ExchangeAPIBase):
 
     def _funding_rate_prepare_request(self, symbol, instType, starttime, endtime, limit):
         request_url = os.path.join(self._base_url, "funding-history")
-        
+
         params = {
-            "symbol": "XBTUSDM",
-            # "startAt": starttime,
-            # "endAt": endtime,
+            "symbol": symbol,
+            "startAt": starttime,
+            "endAt": endtime,
         }
 
         return Request(
