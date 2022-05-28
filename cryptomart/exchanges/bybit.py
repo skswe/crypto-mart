@@ -1,12 +1,15 @@
 import datetime
 import logging
 import os
+from queue import PriorityQueue
 
 import pandas as pd
+import requests
 from cryptomart.feeds import OHLCVColumn
+from pyutil.cache import cached
 from requests import Request
 
-from ..enums import FundingRateSchema, Interval, OrderBookSchema, OrderBookSide
+from ..enums import FundingRateSchema, InstrumentType, Interval, OrderBookSchema, OrderBookSide
 from .base import ExchangeAPIBase
 from .instrument_names.bybit import instrument_names as bybit_instrument_names
 
@@ -37,6 +40,7 @@ class Bybit(ExchangeAPIBase):
     _max_requests_per_second = 40
     _ohlcv_limit = 200
     _funding_rate_limit = 200
+    _tolerance = "8h"
     _start_inclusive = True
     _end_inclusive = False
 
@@ -49,8 +53,8 @@ class Bybit(ExchangeAPIBase):
         "volume": OHLCVColumn.volume,
     }
     _funding_rate_column_map = {
-        "funding_rate_timestamp": FundingRateSchema.timestamp,
-        "funding_rate": FundingRateSchema.funding_rate,
+        "time": FundingRateSchema.timestamp,
+        "value": FundingRateSchema.funding_rate,
     }
 
     def _ohlcv_prepare_request(self, symbol, instType, interval, starttime, endtime, limit):
@@ -129,7 +133,11 @@ class Bybit(ExchangeAPIBase):
     @staticmethod
     def ET_to_datetime(et):
         # Convert exchange native time format to datetime
-        return datetime.datetime.utcfromtimestamp(int(et))
+        if isinstance(et, str):
+            return datetime.datetime.strptime(et, "%Y-%m-%d %H:%M:%S")
+
+        else:
+            return datetime.datetime.utcfromtimestamp(int(et))
 
     @staticmethod
     def datetime_to_ET(dt):
@@ -144,6 +152,52 @@ class Bybit(ExchangeAPIBase):
     @staticmethod
     def seconds_to_ET(seconds):
         return int(seconds)
+
+    @cached("/tmp/cache/historical_funding_rate", is_method=True, instance_identifiers=["name"])
+    def _funding_rate(
+        self,
+        symbol_name: str,
+        instType: InstrumentType,
+        starttime: datetime.datetime,
+        endtime: datetime.datetime,
+        timedelta: datetime.timedelta,
+        cache_kwargs={},
+    ) -> pd.DataFrame:
+        """Return historical funding rates for given instrument"""
+        if callable(self._funding_rate_limit):
+            limit = self._funding_rate_limit(timedelta)
+        else:
+            limit = self._funding_rate_limit or 100
+
+        data = []
+        # api_timedelta is the effective timedelta (interval) of the funding rate data provided by the api
+        api_timedelta = self._funding_rate_interval
+
+        start_times, end_times, limits = self._ohlcv_get_request_intervals(starttime, endtime, api_timedelta, limit)
+        for _starttime, _endtime, limit in zip(start_times, end_times, limits):
+
+            i = 1
+            last_page = 1
+            while i <= last_page:
+                date = (
+                    str(datetime.datetime.date(self.ET_to_datetime(_starttime)))
+                    + "~"
+                    + str(datetime.datetime.date(self.ET_to_datetime(_endtime)))
+                )
+
+                _params = {"symbol": symbol_name, "date": date, "page": i}
+                _res = requests.get("https://api2.bybit.com/linear/funding-rate/list", params=_params).json()
+                last_page = _res["result"]["last_page"]
+                page_data = _res["result"]["data"]
+                data.extend(page_data)
+                i += 1
+
+        data: pd.DataFrame = pd.DataFrame(data).loc[:, self._funding_rate_column_map.keys()]
+        data.rename(columns=self._funding_rate_column_map, inplace=True)
+
+        df_funding = self._funding_rate_res_to_dataframe(data, starttime, endtime, timedelta)
+
+        return df_funding
 
 
 _exchange_export = Bybit
