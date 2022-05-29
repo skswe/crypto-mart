@@ -19,7 +19,7 @@ def exchange(client, request):
     return getattr(client, request.param)
 
 
-@pytest.mark.parametrize("instType", [InstrumentType.PERPETUAL, InstrumentType.QUARTERLY])
+@pytest.mark.parametrize("instType", [InstrumentType.PERPETUAL, InstrumentType.SPOT])
 @pytest.mark.parametrize("symbol", [Symbol.BTC, Symbol.ETH, Symbol.ADA, Symbol.DOGE])
 @pytest.mark.parametrize("interval", [Interval.interval_1d])
 @pytest.mark.parametrize(["starttime", "endtime"], [(datetime(2021, 10, 1), datetime(2021, 12, 3))])

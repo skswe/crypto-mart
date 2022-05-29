@@ -130,6 +130,7 @@ class ExchangeAPIBase(AbstractExchangeAPIBase):
         use_instruments_cache: bool = True,
         refresh_instruments_cache: bool = False,
         cache_path: str = "/tmp/cache",
+        disable_load_instruments: bool = False,
     ):
         self._missing_data_threshold = missing_data_threshold
         rate_limit_delay = 1 / self._max_requests_per_second
@@ -153,36 +154,37 @@ class ExchangeAPIBase(AbstractExchangeAPIBase):
 
         self.active_instruments = self.all_instruments.copy()
 
-        # Load active instruments as the set of instruments that have a valid listing date
-        # Defined as function so result can be cached
-        @cached(
-            os.path.join(self.cache_path, "instruments"),
-            identifiers=[self.name],
-            disabled=not use_instruments_cache,
-            refresh=refresh_instruments_cache,
-        )
-        def load_active_instruments():
-            logger.debug(f"Active instruments before getting listings: \n {self.active_instruments.head(20)}")
-            self.active_instruments[Instrument.listing_date] = self.active_instruments.apply(
-                lambda r: self._ohlcv_get_instrument_listing(
-                    r.symbol,
-                    r.instType,
-                    cache_kwargs={
-                        "disabled": not use_instruments_cache,
-                        "refresh": refresh_instruments_cache,
-                        "path": os.path.join(self.cache_path, "listing"),
-                    },
-                ),
-                axis=1,
+        if not disable_load_instruments:
+            # Load active instruments as the set of instruments that have a valid listing date
+            # Defined as function so result can be cached
+            @cached(
+                os.path.join(self.cache_path, "instruments"),
+                identifiers=[self.name],
+                disabled=not use_instruments_cache,
+                refresh=refresh_instruments_cache,
             )
-            logger.debug(f"Active instruments after getting listings: \n {self.active_instruments.head(20)}")
-            self.active_instruments = self.active_instruments[
-                self.active_instruments[Instrument.listing_date] != INVALID_DATE
-            ]
-            logger.debug(f"Active instruments after dropping rows: \n {self.active_instruments.head(20)}")
-            return self.active_instruments
+            def load_active_instruments():
+                logger.debug(f"Active instruments before getting listings: \n {self.active_instruments.head(20)}")
+                self.active_instruments[Instrument.listing_date] = self.active_instruments.apply(
+                    lambda r: self._ohlcv_get_instrument_listing(
+                        r.symbol,
+                        r.instType,
+                        cache_kwargs={
+                            "disabled": not use_instruments_cache,
+                            "refresh": refresh_instruments_cache,
+                            "path": os.path.join(self.cache_path, "listing"),
+                        },
+                    ),
+                    axis=1,
+                )
+                logger.debug(f"Active instruments after getting listings: \n {self.active_instruments.head(20)}")
+                self.active_instruments = self.active_instruments[
+                    self.active_instruments[Instrument.listing_date] != INVALID_DATE
+                ]
+                logger.debug(f"Active instruments after dropping rows: \n {self.active_instruments.head(20)}")
+                return self.active_instruments
 
-        self.active_instruments = load_active_instruments()
+            self.active_instruments = load_active_instruments()
 
     @property
     def log_level(self):
@@ -365,7 +367,7 @@ class ExchangeAPIBase(AbstractExchangeAPIBase):
                 else:
                     logger.warning(msg)
 
-        df = self._ohlcv_res_to_dataframe(response, starttime, endtime, timedelta)
+        df = self._ohlcv_res_to_dataframe(response, starttime, endtime, timedelta, instType)
 
         return df
 
@@ -489,6 +491,7 @@ class ExchangeAPIBase(AbstractExchangeAPIBase):
         starttime: datetime.datetime,
         endtime: datetime.datetime,
         timedelta: datetime.timedelta,
+        instType: InstrumentType,
         time_column: str = "open_time",
     ) -> pd.DataFrame:
         """Convert list of datapoints from OHLCV API call to standard OHLCV DataFrame, using `column_map`
@@ -498,23 +501,32 @@ class ExchangeAPIBase(AbstractExchangeAPIBase):
             starttime (datetime.datetime): starttime to snap DataFrame to
             endtime (datetime.datetime): endtime to snap DataFrame to
             timedelta (datetime.timedelta): timedelta to compute snapping logic
+            instType (InstrumentType): type of instrument for ohlcv request
             time_column (str): whether to use open_time or close_time as main time index
 
         Returns:
             (pd.DataFrame): datframe with columns: [open_time, open, high, low, close, volume]
         """
+        if instType == InstrumentType.SPOT and hasattr(self, "_ohlcv_column_map_spot"):
+            # This soft-fix exists for exchanges where the column mapping differs between instrument types
+            # to avoid this soft-fix, each exchange can implement column mappings for all instrument types.
+            # However, most exchanges maintain uniform a column schema across instrument types.
+            col_map = self._ohlcv_column_map_spot
+        else:
+            col_map = self._ohlcv_column_map
+
         if isinstance(data, pd.DataFrame):
             # Response already formatted as dataframe
             pass
         elif isinstance(data[0], list) or isinstance(data[0], np.ndarray):
             # Response has unlabeled data (list)
-            data = np.array(data)[:, list(self._ohlcv_column_map.keys())]
-            data = pd.DataFrame(data, columns=list(self._ohlcv_column_map.values()))
+            data = np.array(data)[:, list(col_map.keys())]
+            data = pd.DataFrame(data, columns=list(col_map.values()))
         else:
             # Response has labeled data (dict)
             data: pd.DataFrame = pd.DataFrame(data)
-            data.rename(columns=self._ohlcv_column_map, inplace=True)
-            data = data[self._ohlcv_column_map.values()]
+            data.rename(columns=col_map, inplace=True)
+            data = data[col_map.values()]
 
         # Convert open_time to datetime
         if time_column == "close_time":

@@ -46,17 +46,35 @@ class Kucoin(ExchangeAPIBase):
         4: OHLCVColumn.close,
         5: OHLCVColumn.volume,
     }
+    
+    _ohlcv_column_map_spot = {
+        0: OHLCVColumn.open_time,
+        1: OHLCVColumn.open,
+        3: OHLCVColumn.high,
+        4: OHLCVColumn.low,
+        2: OHLCVColumn.close,
+        5: OHLCVColumn.volume,
+    }
 
     def _ohlcv_prepare_request(self, symbol, instType, interval, starttime, endtime, limit):
         if instType == InstrumentType.PERPETUAL:
             request_url = os.path.join(self._futures_base_url, "api/v1/kline/query")
+            params = {
+                "symbol": symbol,
+                "granularity": interval,
+                "from": starttime,
+                "to": endtime,
+            }
+        elif instType == InstrumentType.SPOT:
+            request_url = os.path.join(self._futures_base_url, "api/v1/market/candle")
+            params = {
+                "symbol": symbol,
+                "type": interval,
+                "startAt": starttime,
+                "endAt": endtime,
+            }
+            
 
-        params = {
-            "symbol": symbol,
-            "granularity": interval,
-            "from": starttime,
-            "to": endtime,
-        }
 
         return Request("GET", request_url, params=params)
 

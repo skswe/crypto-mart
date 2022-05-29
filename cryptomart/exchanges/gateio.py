@@ -6,7 +6,7 @@ import pandas as pd
 from pyutil.cache import cached
 from requests import Request, get
 
-from ..enums import Interval, OrderBookSchema, OrderBookSide
+from ..enums import InstrumentType, Interval, OrderBookSchema, OrderBookSide
 from ..feeds import OHLCVColumn
 from .base import ExchangeAPIBase
 from .instrument_names.gateio import instrument_names as gateio_instrument_names
@@ -44,14 +44,25 @@ class GateIO(ExchangeAPIBase):
         "v": OHLCVColumn.volume,
     }
 
+    _ohlcv_column_map_spot = {
+        0: OHLCVColumn.open_time,
+        5: OHLCVColumn.open,
+        3: OHLCVColumn.high,
+        4: OHLCVColumn.low,
+        2: OHLCVColumn.close,
+        1: OHLCVColumn.volume,
+    }
+
     def _ohlcv_prepare_request(self, symbol, instType, interval, starttime, endtime, limit):
-        url = "futures/usdt/candlesticks"
+        url = "spot/candlesticks" if instType == InstrumentType.SPOT else "futures/usdt/candlesticks"
+
         params = {
             "contract": symbol,
             "interval": interval,
             "from": starttime,
             "to": endtime,
         }
+
         request_url = os.path.join(self._base_url, url)
         return Request("GET", request_url, params=params)
 

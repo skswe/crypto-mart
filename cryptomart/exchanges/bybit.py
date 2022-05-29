@@ -6,7 +6,7 @@ import pandas as pd
 from cryptomart.feeds import OHLCVColumn
 from requests import Request
 
-from ..enums import Interval, OrderBookSchema, OrderBookSide
+from ..enums import InstrumentType, Interval, OrderBookSchema, OrderBookSide
 from .base import ExchangeAPIBase
 from .instrument_names.bybit import instrument_names as bybit_instrument_names
 
@@ -48,14 +48,37 @@ class Bybit(ExchangeAPIBase):
         "volume": OHLCVColumn.volume,
     }
 
+    _ohlcv_column_map_spot = {
+        0: OHLCVColumn.open_time,
+        1: OHLCVColumn.open,
+        2: OHLCVColumn.high,
+        3: OHLCVColumn.low,
+        4: OHLCVColumn.close,
+        5: OHLCVColumn.volume,
+    }
     def _ohlcv_prepare_request(self, symbol, instType, interval, starttime, endtime, limit):
-        url = "public/linear/kline"
-        params = {
-            "symbol": symbol,
-            "interval": interval,
-            "from": starttime,
-            "limit": limit,
-        }
+        if instType == InstrumentType.PERPETUAL:
+            url = "public/linear/kline"
+        elif instType == InstrumentType.SPOT:
+            url = "spot/quote/v1/kline"
+
+        if instType == InstrumentType.PERPETUAL:
+            params = {
+                "symbol": symbol,
+                "interval": interval,
+                "from": starttime,
+                "limit": limit,
+            }
+            
+        elif instType == InstrumentType.SPOT:
+            params = {
+                "symbol": symbol,
+                "interval": interval,
+                "startTime": starttime,
+                "endTime": endtime,
+                "limit": limit,
+            }
+            
         request_url = os.path.join(self._base_url, url)
         return Request("GET", request_url, params=params)
 

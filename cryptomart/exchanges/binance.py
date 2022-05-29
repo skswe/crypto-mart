@@ -52,6 +52,10 @@ class Binance(ExchangeAPIBase):
     def _ohlcv_prepare_request(self, symbol, instType, interval, starttime, endtime, limit):
         if instType == InstrumentType.PERPETUAL:
             request_url = os.path.join(self._futures_base_url, "fapi/v1/klines")
+        elif instType == InstrumentType.SPOT:
+            request_url = os.path.join(self._base_url, "api/v3/klines")
+
+        if instType in [InstrumentType.PERPETUAL, InstrumentType.SPOT]:
             params = {
                 "symbol": symbol,
                 "interval": interval,

@@ -37,17 +37,18 @@ class CoinFLEX(ExchangeAPIBase):
     _end_inclusive = True
 
     _ohlcv_column_map = {
-        "timestamp": OHLCVColumn.open_time,
+        "openedAt": OHLCVColumn.open_time,
         "open": OHLCVColumn.open,
         "high": OHLCVColumn.high,
         "low": OHLCVColumn.low,
         "close": OHLCVColumn.close,
-        "volume24h": OHLCVColumn.volume,
+        "volume": OHLCVColumn.volume,
     }
 
     def _ohlcv_prepare_request(self, symbol, instType, interval, starttime, endtime, limit):
-        url = f"v2/candles/{symbol}"
+        url = f"v3/candles"
         params = {
+            "marketCode": symbol,
             "timeframe": interval,
             "limit": limit,
             "startTime": starttime,
