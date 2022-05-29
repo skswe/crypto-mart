@@ -1,6 +1,8 @@
 import json
 import os
 import sys
+from io import TextIOWrapper
+from typing import Union
 
 import pandas as pd
 import requests
@@ -13,22 +15,75 @@ def format_df(df: pd.DataFrame) -> pd.DataFrame:
     return df[MAPPING_COLUMNS].sort_values("cryptomart_symbol").reset_index(drop=True)
 
 
-def format_as_code(df: pd.DataFrame, file: str = None) -> str:
+def format_mappings_as_code(df: pd.DataFrame, file: Union[str, TextIOWrapper] = None, instType: str = "spot") -> str:
     lines = []
     for idx, row in df.iterrows():
-        lines.append(f'{row.cryptomart_symbol} = "{row.exchange_symbol}"')
+        # Append _ to the start of symbols that start with a number
+        if row.cryptomart_symbol.startswith(tuple(str(x) for x in range(1, 9))):
+            cryptomart_symbol = f"_{row.cryptomart_symbol}"
+        else:
+            cryptomart_symbol = row.cryptomart_symbol
+        lines.append(f'    Symbol.{cryptomart_symbol}: "{row.exchange_symbol}",\n')
+
+    def write_to_file(f):
+        f.write(f"InstrumentType.{instType.upper()}: {{\n")
+        f.writelines(lines)
+        f.write("},\n")
+
+    if file is not None:
+        if isinstance(file, TextIOWrapper):
+            write_to_file(file)
+        else:
+            with open(file, "w") as f:
+                write_to_file(f)
+
+    return "\n".join(lines)
+
+
+def format_symbols_as_code(symbols: set, file: str = None) -> str:
+    lines = []
+    for symbol in sorted(symbols):
+        if symbol.startswith(tuple(str(x) for x in range(1, 9))):
+            symbol = f"_{symbol}"
+        lines.append(f'    {symbol} = "{symbol}"\n')
 
     if file is not None:
         with open(file, "w") as f:
+            f.write("class Symbol(NameEnum):\n")
             f.writelines(lines)
 
     return "\n".join(lines)
 
 
+def get_all_symbols() -> set:
+    all_symbols = set()
+    for exchange in Binance, FTX, Bybit, OKEx, CoinFLEX, BitMEX, GateIO, Kucoin:
+        perp_symbols = set(exchange().get_mappings("perpetual").cryptomart_symbol.to_list())
+        spot_symbols = set(exchange().get_mappings("spot").cryptomart_symbol.to_list())
+        all_symbols = all_symbols | perp_symbols | spot_symbols
+    return all_symbols
+
+
+def create_instrument_file(exchange):
+    inst = exchange()
+    path = os.path.join(os.getcwd(), f"cryptomart/exchanges/instrument_names/{exchange.name}.py")
+
+    with open(path, "w") as f:
+        f.write("from ...enums import InstrumentType, Symbol\n")
+        f.write("instrument_names = {\n")
+        for instType in ["perpetual", "spot"]:
+            mappings = inst.get_mappings(instType)
+            format_mappings_as_code(
+                mappings,
+                file=f,
+            )
+        f.write("}")
+
+
 class Binance(exchanges.Binance):
     ACCEPTED_QUOTE_ASSETS = {InstrumentType.PERPETUAL: ["USDT"], InstrumentType.SPOT: ["USDT"]}
 
-    def get_mappings(self, instType):
+    def get_mappings(self, instType: InstrumentType) -> pd.DataFrame:
         base_url = self._base_url if instType == InstrumentType.SPOT else self._futures_base_url
         suburl = "api/v3/exchangeInfo" if instType == InstrumentType.SPOT else "fapi/v1/exchangeInfo"
         url = os.path.join(base_url, suburl)
@@ -49,7 +104,7 @@ class Binance(exchanges.Binance):
 class BitMEX(exchanges.BitMEX):
     ACCEPTED_QUOTE_ASSETS = {InstrumentType.PERPETUAL: ["USDT"], InstrumentType.SPOT: ["USDT"]}
 
-    def get_mappings(self, instType):
+    def get_mappings(self, instType: InstrumentType) -> pd.DataFrame:
         base_url = self._base_url
         url = os.path.join(base_url, "instrument")
         quote_assets = self.ACCEPTED_QUOTE_ASSETS[instType]
@@ -78,7 +133,7 @@ class BitMEX(exchanges.BitMEX):
 class Bybit(exchanges.Bybit):
     ACCEPTED_QUOTE_ASSETS = {InstrumentType.PERPETUAL: ["USDT"], InstrumentType.SPOT: ["USDT"]}
 
-    def get_mappings(self, instType):
+    def get_mappings(self, instType: InstrumentType) -> pd.DataFrame:
         # Bybit has the same symbols for PERPs and SPOT
         base_url = self._base_url
         url = os.path.join(base_url, "v2/public/symbols")
@@ -103,7 +158,7 @@ class Bybit(exchanges.Bybit):
 class CoinFLEX(exchanges.CoinFLEX):
     ACCEPTED_QUOTE_ASSETS = {InstrumentType.PERPETUAL: ["USD"], InstrumentType.SPOT: ["USD"]}
 
-    def get_mappings(self, instType):
+    def get_mappings(self, instType: InstrumentType) -> pd.DataFrame:
         # Bybit has the same symbols for PERPs and SPOT
         base_url = self._base_url
         url = os.path.join(base_url, "v3/markets")
@@ -127,7 +182,7 @@ class CoinFLEX(exchanges.CoinFLEX):
 class FTX(exchanges.FTX):
     ACCEPTED_QUOTE_ASSETS = {InstrumentType.PERPETUAL: ["USDT"], InstrumentType.SPOT: ["USD"]}
 
-    def get_mappings(self, instType):
+    def get_mappings(self, instType: InstrumentType) -> pd.DataFrame:
         base_url = self._base_url
         url = os.path.join(base_url, "markets")
         quote_assets = self.ACCEPTED_QUOTE_ASSETS[instType]
@@ -156,7 +211,7 @@ class FTX(exchanges.FTX):
 class GateIO(exchanges.GateIO):
     ACCEPTED_QUOTE_ASSETS = {InstrumentType.PERPETUAL: ["USDT"], InstrumentType.SPOT: ["USDT"]}
 
-    def get_mappings(self, instType):
+    def get_mappings(self, instType: InstrumentType) -> pd.DataFrame:
         base_url = self._base_url
         suburl = "spot/currency_pairs" if instType == InstrumentType.SPOT else "futures/usdt/contracts"
         url = os.path.join(base_url, suburl)
@@ -182,7 +237,7 @@ class GateIO(exchanges.GateIO):
 class Kucoin(exchanges.Kucoin):
     ACCEPTED_QUOTE_ASSETS = {InstrumentType.PERPETUAL: ["USDT"], InstrumentType.SPOT: ["USDT"]}
 
-    def get_mappings(self, instType):
+    def get_mappings(self, instType: InstrumentType) -> pd.DataFrame:
         base_url = self._base_url if instType == InstrumentType.SPOT else self._futures_base_url
         suburl = "api/v1/symbols" if instType == InstrumentType.SPOT else "api/v1/contracts/active"
         url = os.path.join(base_url, suburl)
@@ -208,7 +263,7 @@ class Kucoin(exchanges.Kucoin):
 class OKEx(exchanges.OKEx):
     ACCEPTED_QUOTE_ASSETS = {InstrumentType.PERPETUAL: ["USDT"], InstrumentType.SPOT: ["USDT"]}
 
-    def get_mappings(self, instType):
+    def get_mappings(self, instType: InstrumentType) -> pd.DataFrame:
         # Bybit has the same symbols for PERPs and SPOT
         base_url = self._base_url
         url = os.path.join(base_url, "public/instruments")
