@@ -45,7 +45,7 @@ class CoinFLEX(ExchangeAPIBase):
         "volume": OHLCVColumn.volume,
     }
 
-    def _ohlcv_prepare_request(self, symbol, instType, interval, starttime, endtime, limit):
+    def _ohlcv_prepare_request(self, symbol, inst_type, interval, starttime, endtime, limit):
         url = f"v3/candles"
         params = {
             "marketCode": symbol,
@@ -68,7 +68,7 @@ class CoinFLEX(ExchangeAPIBase):
             raise Exception(response["message"])
         return response["data"]
 
-    def _order_book_prepare_request(self, symbol, instType, depth=50):
+    def _order_book_prepare_request(self, symbol, inst_type, depth=50):
         request_url = os.path.join(self._base_url, f"v3/depth")
 
         params = {
@@ -86,17 +86,21 @@ class CoinFLEX(ExchangeAPIBase):
             # TODO: build exception handling where reponse error can be fixed
             raise Exception("No data found for these parameters")
         response = response["data"]
-        bids = pd.DataFrame(response["bids"], columns=[OrderBookSchema.price, OrderBookSchema.quantity, "null1", "null2"]).assign(
-            **{OrderBookSchema.side: OrderBookSide.bid}
-        ).drop(columns=["null1", "null2"])
-        asks = pd.DataFrame(response["asks"], columns=[OrderBookSchema.price, OrderBookSchema.quantity, "null1", "null2"]).assign(
-            **{OrderBookSchema.side: OrderBookSide.ask}
-        ).drop(columns=["null1", "null2"])
+        bids = (
+            pd.DataFrame(response["bids"], columns=[OrderBookSchema.price, OrderBookSchema.quantity, "null1", "null2"])
+            .assign(**{OrderBookSchema.side: OrderBookSide.bid})
+            .drop(columns=["null1", "null2"])
+        )
+        asks = (
+            pd.DataFrame(response["asks"], columns=[OrderBookSchema.price, OrderBookSchema.quantity, "null1", "null2"])
+            .assign(**{OrderBookSchema.side: OrderBookSide.ask})
+            .drop(columns=["null1", "null2"])
+        )
         return bids.merge(asks, how="outer").assign(
             **{OrderBookSchema.timestamp: self.ET_to_datetime(response["lastUpdatedAt"]).replace(microsecond=0)}
         )
 
-    def _order_book_quantity_multiplier(self, symbol, instType, **kwargs):
+    def _order_book_quantity_multiplier(self, symbol, inst_type, **kwargs):
         return 1
 
 

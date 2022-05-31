@@ -46,7 +46,7 @@ class Kucoin(ExchangeAPIBase):
         4: OHLCVColumn.close,
         5: OHLCVColumn.volume,
     }
-    
+
     _ohlcv_column_map_spot = {
         0: OHLCVColumn.open_time,
         1: OHLCVColumn.open,
@@ -56,8 +56,8 @@ class Kucoin(ExchangeAPIBase):
         5: OHLCVColumn.volume,
     }
 
-    def _ohlcv_prepare_request(self, symbol, instType, interval, starttime, endtime, limit):
-        if instType == InstrumentType.PERPETUAL:
+    def _ohlcv_prepare_request(self, symbol, inst_type, interval, starttime, endtime, limit):
+        if inst_type == InstrumentType.PERPETUAL:
             request_url = os.path.join(self._futures_base_url, "api/v1/kline/query")
             params = {
                 "symbol": symbol,
@@ -65,7 +65,7 @@ class Kucoin(ExchangeAPIBase):
                 "from": starttime,
                 "to": endtime,
             }
-        elif instType == InstrumentType.SPOT:
+        elif inst_type == InstrumentType.SPOT:
             request_url = os.path.join(self._futures_base_url, "api/v1/market/candle")
             params = {
                 "symbol": symbol,
@@ -73,8 +73,6 @@ class Kucoin(ExchangeAPIBase):
                 "startAt": starttime,
                 "endAt": endtime,
             }
-            
-
 
         return Request("GET", request_url, params=params)
 
@@ -87,8 +85,8 @@ class Kucoin(ExchangeAPIBase):
             raise Exception(response["msg"])
         return response["data"]
 
-    def _order_book_prepare_request(self, symbol, instType, depth):
-        if instType == InstrumentType.PERPETUAL:
+    def _order_book_prepare_request(self, symbol, inst_type, depth):
+        if inst_type == InstrumentType.PERPETUAL:
             request_url = os.path.join(self._futures_base_url, "api/v1/level2/depth100")
 
         return Request(
@@ -119,7 +117,7 @@ class Kucoin(ExchangeAPIBase):
         return df
 
     @cached("/tmp/cache/order_book_multiplier", is_method=True, instance_identifiers=["name"], log_level="DEBUG")
-    def _order_book_quantity_multiplier(self, symbol, instType, **kwargs):
+    def _order_book_quantity_multiplier(self, symbol, inst_type, **kwargs):
         request_url = os.path.join(self._base_url, f"api/v1/contracts/{symbol}")
         res = get(request_url).json()
         return float(res["data"]["multiplier"])

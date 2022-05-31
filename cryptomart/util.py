@@ -1,3 +1,4 @@
+import datetime
 import logging
 import threading
 import time
@@ -6,7 +7,22 @@ from typing import Callable, List, Union
 
 import requests
 
-logger = logging.getLogger(__name__)
+from .types import TimeType
+
+
+def parse_time(time: TimeType) -> datetime.datetime:
+    if isinstance(time, datetime.datetime):
+        return time
+    elif isinstance(time, int) or isinstance(time, float):
+        for denominator in [1, 1e3, 1e6]:
+            try:
+                return datetime.datetime.utcfromtimestamp(time / denominator)
+            except AttributeError:
+                continue
+    elif isinstance(time, str):
+        return datetime.datetime(time)
+    elif isinstance(time, tuple):
+        return datetime.datetime(*time)
 
 
 class Clock:
@@ -26,31 +42,29 @@ class Clock:
 
 
 class Dispatcher:
-    def __init__(self, dispatch_fn: Callable = None, timeout: float = 0, debug: bool = False):
+    def __init__(self, name: str, dispatch_fn: Callable = None, timeout: float = 0):
         self.dispatch_fn = dispatch_fn or self._default_dispatch_fn
         self.pending_queue = Queue()
         self.result_queue = Queue()
 
         self.timeout = timeout
 
-        if debug:
-            logger.setLevel("DEBUG")
+        self.logger = logging.getLogger(f"cryptomart.{name}")
 
         # Create daemon to process requests
         worker_thread = threading.Thread(target=self.worker_fn, daemon=True)
         worker_thread.start()
 
-    @staticmethod
-    def _default_dispatch_fn(request: requests.Request) -> Union[dict, None]:
-        logger.debug(f"Dispatcher: Making request -- {request.method}: {request.url}, params={request.params}")
+    def _default_dispatch_fn(self, request: requests.Request) -> Union[dict, None]:
+        self.logger.debug(f"Dispatcher: Making request -- {request.method}: {request.url}, params={request.params}")
         try:
             with requests.Session() as s:
                 res = s.send(request.prepare()).json()
             assert isinstance(res, dict) or isinstance(res, list), f"Unexpected response: {res}"
         except Exception as e:
-            logger.error(f"Dispatcher: Error in request -- {request.method}: {request.url}: {e}")
+            self.logger.error(f"Dispatcher: Error in request -- {request.method}: {request.url}: {e}")
             res = None
-        logger.debug("Dispatcher: Got response")
+        self.logger.debug("Dispatcher: Got response")
         return res
 
     def add_request(self, request: requests.Request):
@@ -83,7 +97,7 @@ class Dispatcher:
         return results
 
     def worker_fn(self):
-        logger.debug("Dispatcher: Worker thread starting")
+        self.logger.debug("Worker thread starting")
         time_since_request = Clock(intitial_time=self.timeout)
         while True:
             time_to_wait = self.timeout - time_since_request.time()

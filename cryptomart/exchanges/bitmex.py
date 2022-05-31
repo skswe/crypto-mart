@@ -42,7 +42,7 @@ class BitMEX(ExchangeAPIBase):
         "volume": OHLCVColumn.volume,
     }
 
-    def _ohlcv_prepare_request(self, symbol, instType, interval, starttime, endtime, limit):
+    def _ohlcv_prepare_request(self, symbol, inst_type, interval, starttime, endtime, limit):
         url = "trade/bucketed"
         params = {
             "symbol": symbol,
@@ -64,7 +64,7 @@ class BitMEX(ExchangeAPIBase):
             raise Exception(response["error"]["message"])
         return response
 
-    def _order_book_prepare_request(self, symbol, instType, depth=50):
+    def _order_book_prepare_request(self, symbol, inst_type, depth=50):
         request_url = os.path.join(self._base_url, "orderBook/L2")
 
         return Request(
@@ -93,7 +93,7 @@ class BitMEX(ExchangeAPIBase):
         )
         return df
 
-    def _order_book_quantity_multiplier(self, symbol, instType, **kwargs):
+    def _order_book_quantity_multiplier(self, symbol, inst_type, **kwargs):
         return 1
 
     @staticmethod

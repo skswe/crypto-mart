@@ -53,8 +53,8 @@ class GateIO(ExchangeAPIBase):
         1: OHLCVColumn.volume,
     }
 
-    def _ohlcv_prepare_request(self, symbol, instType, interval, starttime, endtime, limit):
-        url = "spot/candlesticks" if instType == InstrumentType.SPOT else "futures/usdt/candlesticks"
+    def _ohlcv_prepare_request(self, symbol, inst_type, interval, starttime, endtime, limit):
+        url = "spot/candlesticks" if inst_type == InstrumentType.SPOT else "futures/usdt/candlesticks"
 
         params = {
             "contract": symbol,
@@ -76,7 +76,7 @@ class GateIO(ExchangeAPIBase):
 
         return response[:-1]
 
-    def _order_book_prepare_request(self, symbol, instType, depth=50):
+    def _order_book_prepare_request(self, symbol, inst_type, depth=50):
         request_url = os.path.join(self._base_url, "futures/usdt/order_book")
 
         return Request(
@@ -114,7 +114,7 @@ class GateIO(ExchangeAPIBase):
         return df
 
     @cached("/tmp/cache/order_book_multiplier", is_method=True, instance_identifiers=["name"], log_level="DEBUG")
-    def _order_book_quantity_multiplier(self, symbol, instType, **kwargs):
+    def _order_book_quantity_multiplier(self, symbol, inst_type, **kwargs):
         request_url = os.path.join(self._base_url, f"futures/usdt/contracts/{symbol}")
         logger.debug(request_url)
         res = get(request_url).json()

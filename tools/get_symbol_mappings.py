@@ -15,7 +15,7 @@ def format_df(df: pd.DataFrame) -> pd.DataFrame:
     return df[MAPPING_COLUMNS].sort_values("cryptomart_symbol").reset_index(drop=True)
 
 
-def format_mappings_as_code(df: pd.DataFrame, file: Union[str, TextIOWrapper] = None, instType: str = "spot") -> str:
+def format_mappings_as_code(df: pd.DataFrame, file: Union[str, TextIOWrapper] = None, inst_type: str = "spot") -> str:
     lines = []
     for idx, row in df.iterrows():
         # Append _ to the start of symbols that start with a number
@@ -26,7 +26,7 @@ def format_mappings_as_code(df: pd.DataFrame, file: Union[str, TextIOWrapper] = 
         lines.append(f'    Symbol.{cryptomart_symbol}: "{row.exchange_symbol}",\n')
 
     def write_to_file(f):
-        f.write(f"InstrumentType.{instType.upper()}: {{\n")
+        f.write(f"InstrumentType.{inst_type.upper()}: {{\n")
         f.writelines(lines)
         f.write("},\n")
 
@@ -71,8 +71,8 @@ def create_instrument_file(exchange):
     with open(path, "w") as f:
         f.write("from ...enums import InstrumentType, Symbol\n")
         f.write("instrument_names = {\n")
-        for instType in ["perpetual", "spot"]:
-            mappings = inst.get_mappings(instType)
+        for inst_type in ["perpetual", "spot"]:
+            mappings = inst.get_mappings(inst_type)
             format_mappings_as_code(
                 mappings,
                 file=f,
@@ -83,11 +83,11 @@ def create_instrument_file(exchange):
 class Binance(exchanges.Binance):
     ACCEPTED_QUOTE_ASSETS = {InstrumentType.PERPETUAL: ["USDT"], InstrumentType.SPOT: ["USDT"]}
 
-    def get_mappings(self, instType: InstrumentType) -> pd.DataFrame:
-        base_url = self._base_url if instType == InstrumentType.SPOT else self._futures_base_url
-        suburl = "api/v3/exchangeInfo" if instType == InstrumentType.SPOT else "fapi/v1/exchangeInfo"
+    def get_mappings(self, inst_type: InstrumentType) -> pd.DataFrame:
+        base_url = self._base_url if inst_type == InstrumentType.SPOT else self._futures_base_url
+        suburl = "api/v3/exchangeInfo" if inst_type == InstrumentType.SPOT else "fapi/v1/exchangeInfo"
         url = os.path.join(base_url, suburl)
-        quote_assets = self.ACCEPTED_QUOTE_ASSETS[instType]
+        quote_assets = self.ACCEPTED_QUOTE_ASSETS[inst_type]
 
         res = requests.get(url)
         data = pd.DataFrame(res.json()["symbols"])
@@ -104,18 +104,18 @@ class Binance(exchanges.Binance):
 class BitMEX(exchanges.BitMEX):
     ACCEPTED_QUOTE_ASSETS = {InstrumentType.PERPETUAL: ["USDT"], InstrumentType.SPOT: ["USDT"]}
 
-    def get_mappings(self, instType: InstrumentType) -> pd.DataFrame:
+    def get_mappings(self, inst_type: InstrumentType) -> pd.DataFrame:
         base_url = self._base_url
         url = os.path.join(base_url, "instrument")
-        quote_assets = self.ACCEPTED_QUOTE_ASSETS[instType]
+        quote_assets = self.ACCEPTED_QUOTE_ASSETS[inst_type]
 
-        exchange_instType = {
+        exchange_inst_type = {
             InstrumentType.PERPETUAL: "FFWCSX",
             InstrumentType.SPOT: "IFXXXP",
-        }[instType]
+        }[inst_type]
 
         filter = {
-            "typ": exchange_instType,
+            "typ": exchange_inst_type,
             "state": "Open",
             "quoteCurrency": quote_assets,
         }
@@ -133,11 +133,11 @@ class BitMEX(exchanges.BitMEX):
 class Bybit(exchanges.Bybit):
     ACCEPTED_QUOTE_ASSETS = {InstrumentType.PERPETUAL: ["USDT"], InstrumentType.SPOT: ["USDT"]}
 
-    def get_mappings(self, instType: InstrumentType) -> pd.DataFrame:
+    def get_mappings(self, inst_type: InstrumentType) -> pd.DataFrame:
         # Bybit has the same symbols for PERPs and SPOT
         base_url = self._base_url
         url = os.path.join(base_url, "v2/public/symbols")
-        quote_assets = self.ACCEPTED_QUOTE_ASSETS[instType]
+        quote_assets = self.ACCEPTED_QUOTE_ASSETS[inst_type]
 
         res = requests.get(url)
         data = pd.DataFrame(res.json()["result"])
@@ -158,12 +158,12 @@ class Bybit(exchanges.Bybit):
 class CoinFLEX(exchanges.CoinFLEX):
     ACCEPTED_QUOTE_ASSETS = {InstrumentType.PERPETUAL: ["USD"], InstrumentType.SPOT: ["USD"]}
 
-    def get_mappings(self, instType: InstrumentType) -> pd.DataFrame:
+    def get_mappings(self, inst_type: InstrumentType) -> pd.DataFrame:
         # Bybit has the same symbols for PERPs and SPOT
         base_url = self._base_url
         url = os.path.join(base_url, "v3/markets")
-        quote_assets = self.ACCEPTED_QUOTE_ASSETS[instType]
-        type_filter = "SPOT" if instType == InstrumentType.SPOT else "FUTURE"
+        quote_assets = self.ACCEPTED_QUOTE_ASSETS[inst_type]
+        type_filter = "SPOT" if inst_type == InstrumentType.SPOT else "FUTURE"
 
         res = requests.get(url)
 
@@ -182,11 +182,11 @@ class CoinFLEX(exchanges.CoinFLEX):
 class FTX(exchanges.FTX):
     ACCEPTED_QUOTE_ASSETS = {InstrumentType.PERPETUAL: ["USDT"], InstrumentType.SPOT: ["USD"]}
 
-    def get_mappings(self, instType: InstrumentType) -> pd.DataFrame:
+    def get_mappings(self, inst_type: InstrumentType) -> pd.DataFrame:
         base_url = self._base_url
         url = os.path.join(base_url, "markets")
-        quote_assets = self.ACCEPTED_QUOTE_ASSETS[instType]
-        type_filter = "spot" if instType == InstrumentType.SPOT else "future"
+        quote_assets = self.ACCEPTED_QUOTE_ASSETS[inst_type]
+        type_filter = "spot" if inst_type == InstrumentType.SPOT else "future"
 
         res = requests.get(url)
         data = pd.DataFrame(res.json()["result"])
@@ -196,10 +196,10 @@ class FTX(exchanges.FTX):
         data = data[~data.isEtfMarket]
         data = data[~data.restricted]
 
-        if instType == InstrumentType.PERPETUAL:
+        if inst_type == InstrumentType.PERPETUAL:
             data = data[data.name.apply(lambda e: e.endswith("PERP"))]
             data["cryptomart_symbol"] = data["underlying"]
-        elif instType == InstrumentType.SPOT:
+        elif inst_type == InstrumentType.SPOT:
             data = data[data.quoteCurrency.isin(quote_assets)]
             data["cryptomart_symbol"] = data["baseCurrency"]
 
@@ -211,21 +211,21 @@ class FTX(exchanges.FTX):
 class GateIO(exchanges.GateIO):
     ACCEPTED_QUOTE_ASSETS = {InstrumentType.PERPETUAL: ["USDT"], InstrumentType.SPOT: ["USDT"]}
 
-    def get_mappings(self, instType: InstrumentType) -> pd.DataFrame:
+    def get_mappings(self, inst_type: InstrumentType) -> pd.DataFrame:
         base_url = self._base_url
-        suburl = "spot/currency_pairs" if instType == InstrumentType.SPOT else "futures/usdt/contracts"
+        suburl = "spot/currency_pairs" if inst_type == InstrumentType.SPOT else "futures/usdt/contracts"
         url = os.path.join(base_url, suburl)
-        quote_assets = self.ACCEPTED_QUOTE_ASSETS[instType]
+        quote_assets = self.ACCEPTED_QUOTE_ASSETS[inst_type]
 
         res = requests.get(url)
         data = pd.DataFrame(res.json())
 
-        if instType == InstrumentType.PERPETUAL:
+        if inst_type == InstrumentType.PERPETUAL:
             data = data[data.in_delisting == False]
             data = data[data.type == "direct"]
             data["cryptomart_symbol"] = data.name.apply(lambda e: e.replace(f"_{quote_assets[0]}", ""))
             data["exchange_symbol"] = data["name"]
-        elif instType == InstrumentType.SPOT:
+        elif inst_type == InstrumentType.SPOT:
             data = data[data.trade_status == "tradable"]
             data = data[data.quote.isin(quote_assets)]
             data["cryptomart_symbol"] = data["base"]
@@ -237,21 +237,21 @@ class GateIO(exchanges.GateIO):
 class Kucoin(exchanges.Kucoin):
     ACCEPTED_QUOTE_ASSETS = {InstrumentType.PERPETUAL: ["USDT"], InstrumentType.SPOT: ["USDT"]}
 
-    def get_mappings(self, instType: InstrumentType) -> pd.DataFrame:
-        base_url = self._base_url if instType == InstrumentType.SPOT else self._futures_base_url
-        suburl = "api/v1/symbols" if instType == InstrumentType.SPOT else "api/v1/contracts/active"
+    def get_mappings(self, inst_type: InstrumentType) -> pd.DataFrame:
+        base_url = self._base_url if inst_type == InstrumentType.SPOT else self._futures_base_url
+        suburl = "api/v1/symbols" if inst_type == InstrumentType.SPOT else "api/v1/contracts/active"
         url = os.path.join(base_url, suburl)
-        quote_assets = self.ACCEPTED_QUOTE_ASSETS[instType]
+        quote_assets = self.ACCEPTED_QUOTE_ASSETS[inst_type]
 
         res = requests.get(url)
         data = pd.DataFrame(res.json()["data"])
 
         data = data[data.quoteCurrency.isin(quote_assets)]
 
-        if instType == InstrumentType.PERPETUAL:
+        if inst_type == InstrumentType.PERPETUAL:
             data = data[data.status == "Open"]
             data = data[data.isInverse == False]
-        elif instType == InstrumentType.SPOT:
+        elif inst_type == InstrumentType.SPOT:
             data = data[data.enableTrading == True]
 
         data["cryptomart_symbol"] = data["baseCurrency"]
@@ -263,25 +263,25 @@ class Kucoin(exchanges.Kucoin):
 class OKEx(exchanges.OKEx):
     ACCEPTED_QUOTE_ASSETS = {InstrumentType.PERPETUAL: ["USDT"], InstrumentType.SPOT: ["USDT"]}
 
-    def get_mappings(self, instType: InstrumentType) -> pd.DataFrame:
+    def get_mappings(self, inst_type: InstrumentType) -> pd.DataFrame:
         # Bybit has the same symbols for PERPs and SPOT
         base_url = self._base_url
         url = os.path.join(base_url, "public/instruments")
 
-        exchange_instType = {
+        exchange_inst_type = {
             InstrumentType.PERPETUAL: "SWAP",
             InstrumentType.SPOT: "SPOT",
-        }[instType]
+        }[inst_type]
 
-        params = {"instType": exchange_instType}
-        quote_assets = self.ACCEPTED_QUOTE_ASSETS[instType]
+        params = {"inst_type": exchange_inst_type}
+        quote_assets = self.ACCEPTED_QUOTE_ASSETS[inst_type]
 
         res = requests.get(url, params=params)
 
         data = pd.DataFrame(res.json()["data"])
 
         data = data[data.state == "live"]
-        if instType == InstrumentType.PERPETUAL:
+        if inst_type == InstrumentType.PERPETUAL:
             data = data[data.ctType == "linear"]
             data = data[data.settleCcy.isin(quote_assets)]
 

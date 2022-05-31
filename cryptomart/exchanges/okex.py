@@ -43,7 +43,7 @@ class OKEx(ExchangeAPIBase):
         6: OHLCVColumn.volume,
     }
 
-    def _ohlcv_prepare_request(self, symbol, instType, interval, starttime, endtime, limit):
+    def _ohlcv_prepare_request(self, symbol, inst_type, interval, starttime, endtime, limit):
         url = "market/history-candles"
         params = {
             "instId": symbol,
@@ -65,7 +65,7 @@ class OKEx(ExchangeAPIBase):
 
         return np.flip(response["data"], axis=0)
 
-    def _order_book_prepare_request(self, symbol, instType, depth=250):
+    def _order_book_prepare_request(self, symbol, inst_type, depth=250):
         request_url = os.path.join(self._base_url, "market/books")
 
         return Request(
@@ -106,14 +106,14 @@ class OKEx(ExchangeAPIBase):
         return df
 
     @cached("/tmp/cache/order_book_multiplier", is_method=True, instance_identifiers=["name"], log_level="DEBUG")
-    def _order_book_quantity_multiplier(self, symbol, instType, **kwargs):
-        if instType == "perpetual":
-            _instType = "SWAP"
+    def _order_book_quantity_multiplier(self, symbol, inst_type, **kwargs):
+        if inst_type == "perpetual":
+            _inst_type = "SWAP"
         else:
-            _instType = "FUTURES"
+            _inst_type = "FUTURES"
         request_url = os.path.join(self._base_url, f"public/instruments")
         params = {
-            "instType": _instType,
+            "inst_type": _inst_type,
             "symbol": symbol,
         }
         res = get(request_url, params).json()

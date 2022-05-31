@@ -56,21 +56,22 @@ class Bybit(ExchangeAPIBase):
         4: OHLCVColumn.close,
         5: OHLCVColumn.volume,
     }
-    def _ohlcv_prepare_request(self, symbol, instType, interval, starttime, endtime, limit):
-        if instType == InstrumentType.PERPETUAL:
+
+    def _ohlcv_prepare_request(self, symbol, inst_type, interval, starttime, endtime, limit):
+        if inst_type == InstrumentType.PERPETUAL:
             url = "public/linear/kline"
-        elif instType == InstrumentType.SPOT:
+        elif inst_type == InstrumentType.SPOT:
             url = "spot/quote/v1/kline"
 
-        if instType == InstrumentType.PERPETUAL:
+        if inst_type == InstrumentType.PERPETUAL:
             params = {
                 "symbol": symbol,
                 "interval": interval,
                 "from": starttime,
                 "limit": limit,
             }
-            
-        elif instType == InstrumentType.SPOT:
+
+        elif inst_type == InstrumentType.SPOT:
             params = {
                 "symbol": symbol,
                 "interval": interval,
@@ -78,7 +79,7 @@ class Bybit(ExchangeAPIBase):
                 "endTime": endtime,
                 "limit": limit,
             }
-            
+
         request_url = os.path.join(self._base_url, url)
         return Request("GET", request_url, params=params)
 
@@ -91,7 +92,7 @@ class Bybit(ExchangeAPIBase):
             raise Exception(response["ret_msg"])
         return response["result"]
 
-    def _order_book_prepare_request(self, symbol, instType, depth):
+    def _order_book_prepare_request(self, symbol, inst_type, depth):
         request_url = os.path.join(self._base_url, "v2/public/orderBook/L2")
 
         return Request(
@@ -121,7 +122,7 @@ class Bybit(ExchangeAPIBase):
         )
         return df
 
-    def _order_book_quantity_multiplier(self, symbol, instType, **kwargs):
+    def _order_book_quantity_multiplier(self, symbol, inst_type, **kwargs):
         return 1
 
     @staticmethod

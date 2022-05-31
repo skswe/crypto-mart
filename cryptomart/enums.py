@@ -14,12 +14,8 @@ class OHLCVColumn(NameEnum):
 
 
 class Instrument(NameEnum):
-    """Column names for Exchange active_instruments"""
-
-    symbol = "symbol"
-    instType = "instType"
-    contract_name = "contract_name"
-    listing_date = "listing_date"
+    cryptomart_symbol = "cryptomart_symbol"
+    exchange_symbol = "exchange_symbol"
 
 
 class OrderBookSchema(NameEnum):
@@ -58,6 +54,12 @@ class Exchange(NameEnum):
     KUCOIN = "kucoin"
 
 
+class Interface(NameEnum):
+    INSTRUMENT_INFO = "instrument_info"
+    OHLCV = "ohlcv"
+    ORDER_BOOK = "order_book"
+
+
 class InstrumentType(NameEnum):
     """Names of registered instrument types in the API"""
 
@@ -72,18 +74,13 @@ class Interval(NameEnum):
     """Names of registered historical candlestick data intervals in the API"""
 
     interval_1m = "interval_1m"
-    interval_3m = "interval_3m"
     interval_5m = "interval_5m"
     interval_15m = "interval_15m"
-    interval_30m = "interval_30m"
     interval_1h = "interval_1h"
-    interval_2h = "interval_2h"
     interval_4h = "interval_4h"
-    interval_6h = "interval_6h"
     interval_8h = "interval_8h"
     interval_12h = "interval_12h"
     interval_1d = "interval_1d"
-    interval_3d = "interval_3d"
     interval_1w = "interval_1w"
 
 
