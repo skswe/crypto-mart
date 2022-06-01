@@ -20,6 +20,10 @@ logger = logging.getLogger(__name__)
 
 
 class Binance(ExchangeAPIBase):
+
+    name = "binance"
+    interfaces = {}
+
     @staticmethod
     def instrument_info_prepare_request(url: str) -> Request:
         return Request("GET", url)
@@ -102,8 +106,6 @@ class Binance(ExchangeAPIBase):
         return bids.merge(asks, how="outer").assign(**{OrderBookSchema.timestamp: (response["T"])})
 
     def __init__(self):
-        self.name = "binance"
-
         futures_base_url = "https://fapi.binance.com"
         spot_base_url = "https://api.binance.com"
 
