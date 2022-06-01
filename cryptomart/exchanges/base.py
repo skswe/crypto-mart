@@ -8,6 +8,7 @@ from typing import Dict, List, Tuple, Union
 import numpy as np
 import pandas as pd
 import requests
+from cryptomart.types import TimeType
 from pyutil.cache import cached
 from pyutil.dicts import stack_dict
 
@@ -48,12 +49,13 @@ class ExchangeAPIBase(ABC):
         try:
             interface = self.interfaces[interface_name]
         except KeyError:
-            self.logger.error(f"{self.name} does not support {interface_name}")
+            raise NotSupportedError(f"{self.name} does not support {interface_name}")
 
-        try:
-            interface = interface[inst_type]
-        except KeyError:
-            self.logger.error(f"{self.name}.{interface_name} does not support {inst_type}")
+        if isinstance(interface, dict):
+            try:
+                interface = interface[inst_type]
+            except KeyError:
+                raise NotSupportedError(f"{self.name}.{interface_name} does not support {inst_type}")
 
         return interface.run(*args)
 
@@ -63,11 +65,27 @@ class ExchangeAPIBase(ABC):
             inst_type=inst_type,
         )
 
-    def ohlcv(self, symbol, inst_type, interval, starttime, endtime):
-        submit_args = (symbol, interval, starttime, endtime)
-        return self._run_interface(interface_name=Interface.OHLCV, inst_type=inst_type, submit_args=submit_args)
+    def ohlcv(
+        self,
+        symbol: Symbol,
+        inst_type: InstrumentType,
+        interval: Interval = Interval.interval_1d,
+        starttime: TimeType = None,
+        endtime: TimeType = None,
+        strict: bool = False,
+        cache_kwargs: dict = {"disabled": False, "refresh": False},
+    ):
+        if starttime is None:
+            # Get default starttime
+            pass
+        if endtime is None:
+            # Get default endtime
+            pass
+        
+        args = (symbol, interval, starttime, endtime, strict, cache_kwargs)
+        df = self._run_interface(interface_name=Interface.OHLCV, inst_type=inst_type, args=args)
+        return OHLCVFeed(df, self.name, symbol, inst_type, interval, starttime, endtime)
 
     def order_book(self, symbol, inst_type, depth, log_level):
-        submit_args = (symbol, depth, log_level)
-        return self._run_interface(interface_name=Interface.ORDER_BOOK, inst_type=inst_type, submit_args=submit_args)
-
+        args = (symbol, depth, log_level)
+        return self._run_interface(interface_name=Interface.ORDER_BOOK, inst_type=inst_type, args=args)

@@ -1,5 +1,6 @@
 import datetime
 import math
+import os
 from typing import Callable, Dict, List, Tuple
 
 import numpy as np
@@ -56,16 +57,20 @@ class OHLCVInterface(APIInterface):
         self.prepare_request = prepare_request
         self.extract_data = extract_data
         self.valid_data_threshold = valid_data_threshold
-
+    
+    @cached(
+        os.path.join(os.getenv("CM_CACHE_PATH", "/tmp/cache"), "ohlcv"),
+        is_method=True,
+        instance_identifiers=["name"],
+    )
     def run(
         self,
         symbol: Symbol,
         interval: Interval,
         starttime: TimeType,
         endtime: TimeType,
-        disable_cache: bool,
-        refresh_cache: bool,
         strict: bool,
+        cache_kwargs: dict,
     ) -> pd.DataFrame:
         """Run main interface function
 
@@ -74,16 +79,15 @@ class OHLCVInterface(APIInterface):
             interval (Interval): Interval or frequency of bars
             starttime (TimeType): Time of the first open
             endtime (TimeType): Time of the last close
-            disable_cache (bool): If `True`, disables data caching
-            refresh_cache (bool): If `True`, refreshes the data cache with the latest result
             strict (bool): If `True`, raises an exception when missing data is above threshold
+            cache_kwargs (dict): Cache control settings. See pyutil.cache.cached for details.
 
         Raises:
             NotSupportedError: _description_
             MissingDataError: _description_
 
         Returns:
-            pd.DataFrame: _description_
+            pd.DataFrame: OHLCV dataframe
         """
         starttime = parse_time(starttime)
         endtime = parse_time(endtime)
