@@ -1,5 +1,5 @@
 import os
-from typing import Callable, Dict
+from typing import Callable, Dict, Union
 
 import pandas as pd
 from pyutil.cache import cached
@@ -13,44 +13,25 @@ from ..types import JSONDataType
 class InstrumentInfoInterface(APIInterface):
     """API interface to query instrument information. Columns to be returned are defined in the `Instrument` enum."""
 
-    def __init__(
-        self,
-        prepare_request: Callable[[str], Request],
-        extract_data: Callable[[JSONDataType], pd.DataFrame],
-        **api_interface_kwargs
-    ):
-        """Initialize the interface
-
-        Args:
-            prepare_request (Callable[[str], Request]): Function which takes the endpoint URL and returns a `Request` to be sent to the API
-            extract_data (Callable[[JSONDataType], pd.DataFrame]): Function which takes the API response and returns a DataFrame with columns
-                defined in the `Instrument` enum
-        """
+    def __init__(self, **api_interface_kwargs):
         super().__init__(**api_interface_kwargs)
-        self.prepare_request = prepare_request
-        self.extract_response = extract_data
-
-    def run(self) -> pd.DataFrame:
-        """Run main interface function
-
-        Returns:
-            pd.DataFrame: Instrument info
-        """
-        req = self.prepare_request(self.url)
-        res = self.dispatcher.send_request(req)
-        data = self.extract_response(res)
-        return data
 
     @cached(
-        os.path.join(os.getenv("CM_CACHE_PATH", "/tmp/cache"), "symbol_mappings"),
+        os.path.join(os.getenv("CM_CACHE_PATH", "/tmp/cache"), "instrument_info"),
         is_method=True,
         instance_identifiers=["name"],
     )
-    def get_symbol_mappings(self) -> Dict[Symbol, str]:
-        """Return a dictionary mapping between `Symbol` enum and the instrument ID used by the API
+    def run(self, mappings: bool, **cache_kwargs) -> Union[pd.DataFrame, Dict[Symbol, str]]:
+        """Run main interface function
 
+        Args:
+            mappings (bool): Return Symbol to instrument mappings
         Returns:
-            Dict[Symbol, str]: Mapping of `Symbol` enum to API instrument ID
+            pd.DataFrame: Instrument info or Mapping of `Symbol` enum to API instrument ID
         """
-        instrument_info = self.run()
-        return dict(zip(instrument_info[Instrument.cryptomart_symbol], instrument_info[Instrument.exchange_symbol]))
+        data = self.execute(self.dispatcher, self.url)
+
+        if mappings:
+            return dict(zip(data[Instrument.cryptomart_symbol], data[Instrument.exchange_symbol]))
+
+        return data

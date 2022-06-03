@@ -2,27 +2,50 @@ import datetime
 import logging
 import threading
 import time
+from multiprocessing.sharedctypes import Value
 from queue import Queue
 from typing import Callable, List, Union
 
+import pandas as pd
 import requests
 
 from .types import TimeType
 
 
 def parse_time(time: TimeType) -> datetime.datetime:
-    if isinstance(time, datetime.datetime):
-        return time
-    elif isinstance(time, int) or isinstance(time, float):
+    if isinstance(time, pd.Timestamp):
+        return time.to_pydatetime()
+    if isinstance(time, int) or isinstance(time, float):
         for denominator in [1, 1e3, 1e6]:
             try:
                 return datetime.datetime.utcfromtimestamp(time / denominator)
-            except AttributeError:
+            except (ValueError, AttributeError):
                 continue
-    elif isinstance(time, str):
-        return datetime.datetime(time)
+    elif isinstance(time, datetime.datetime):
+        return time.replace(tzinfo=datetime.timezone.utc)
     elif isinstance(time, tuple):
-        return datetime.datetime(*time)
+        return datetime.datetime(*time, tzinfo=datetime.timezone.utc)
+    elif isinstance(time, str):
+        return datetime.datetime.fromisoformat(time.replace("Z", "")).replace(tzinfo=datetime.timezone.utc)
+
+
+def dt_to_timestamp(dt: datetime.datetime, string=False, seconds=False, milliseconds=False):
+    if seconds:
+        coeff = 1
+    elif milliseconds:
+        coeff = 1000
+
+    if string:
+        return dt.strftime("%Y-%m-%d")
+    else:
+        return int(dt.timestamp() * coeff)
+
+
+def show_df(df, max_rows=None, max_columns=None, width=1000):
+    with pd.option_context(
+        "display.max_rows", max_columns, "display.max_columns", max_columns, "display.width", width
+    ):
+        print(df)
 
 
 class Clock:

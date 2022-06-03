@@ -1,32 +1,12 @@
-import datetime
 import logging
-import math
-import os
 from abc import ABC, abstractmethod
-from typing import Dict, List, Tuple, Union
+from typing import Any, Dict
 
-import numpy as np
-import pandas as pd
-import requests
 from cryptomart.types import TimeType
-from pyutil.cache import cached
-from pyutil.dicts import stack_dict
 
-from ..enums import (
-    Instrument,
-    InstrumentType,
-    Interface,
-    Interval,
-    OHLCVColumn,
-    OrderBookSchema,
-    OrderBookSide,
-    Symbol,
-)
-from ..errors import MissingDataError, NotSupportedError
+from ..enums import InstrumentType, Interface, Interval, Symbol
+from ..errors import NotSupportedError
 from ..feeds import OHLCVFeed
-from ..globals import EARLIEST_OHLCV_DATE, END_OHLCV_DATE, INVALID_DATE
-from ..interfaces.ohlcv import OHLCVInterface
-from ..util import Dispatcher
 
 logger = logging.getLogger(__name__)
 
@@ -37,15 +17,27 @@ class ExchangeAPIBase(ABC):
     def name() -> str:
         pass
 
-    @property
-    @abstractmethod
-    def interfaces() -> Dict[Interface, Dict[InstrumentType, OHLCVInterface]]:
-        pass
+    interfaces = {}
 
-    def __init__(self):
+    def __init__(self, cache_kwargs: dict = {"disabled": False, "refresh": False}):
+        """Init the exchange
+
+        Args:
+            cache_kwargs (dict, optional): Cache control settings. See pyutil.cache.cached for details.. Defaults to {"disabled": False, "refresh": False}.
+        """
         self.logger = logging.getLogger(f"cryptomart.{self.name}")
+        self.logger.debug(f"Initializing {self.name}")
+        self.cache_kwargs = cache_kwargs
 
-    def _run_interface(self, interface_name, inst_type, *args):
+    @property
+    def log_level(self):
+        return self.logger.level
+
+    @log_level.setter
+    def log_level(self, level):
+        self.logger.setLevel(level)
+
+    def _get_interface(self, interface_name: Interface, inst_type: InstrumentType):
         try:
             interface = self.interfaces[interface_name]
         except KeyError:
@@ -57,12 +49,16 @@ class ExchangeAPIBase(ABC):
             except KeyError:
                 raise NotSupportedError(f"{self.name}.{interface_name} does not support {inst_type}")
 
-        return interface.run(*args)
+        return interface
 
-    def instrument_info(self, inst_type):
+    def _run_interface(self, interface_name: Interface, inst_type: InstrumentType, *args, **kwargs):
+        self.logger.debug(f"args={args} | kwargs={kwargs}")
+        return self._get_interface(interface_name, inst_type).run(*args, **kwargs)
+
+    def instrument_info(self, inst_type: InstrumentType, mappings: bool = False, cache_kwargs: dict = {}):
+        args = (mappings,)
         return self._run_interface(
-            interface_name=Interface.INSTRUMENT_INFO,
-            inst_type=inst_type,
+            Interface.INSTRUMENT_INFO, inst_type, *args, cache_kwargs=dict(self.cache_kwargs, **cache_kwargs)
         )
 
     def ohlcv(
@@ -73,7 +69,7 @@ class ExchangeAPIBase(ABC):
         starttime: TimeType = None,
         endtime: TimeType = None,
         strict: bool = False,
-        cache_kwargs: dict = {"disabled": False, "refresh": False},
+        cache_kwargs: dict = {},
     ):
         if starttime is None:
             # Get default starttime
@@ -81,11 +77,15 @@ class ExchangeAPIBase(ABC):
         if endtime is None:
             # Get default endtime
             pass
-        
-        args = (symbol, interval, starttime, endtime, strict, cache_kwargs)
-        df = self._run_interface(interface_name=Interface.OHLCV, inst_type=inst_type, args=args)
+
+        args = (symbol, interval, starttime, endtime, strict)
+        df = self._run_interface(
+            Interface.OHLCV, inst_type, *args, cache_kwargs=dict(self.cache_kwargs, **cache_kwargs)
+        )
         return OHLCVFeed(df, self.name, symbol, inst_type, interval, starttime, endtime)
 
-    def order_book(self, symbol, inst_type, depth, log_level):
-        args = (symbol, depth, log_level)
-        return self._run_interface(interface_name=Interface.ORDER_BOOK, inst_type=inst_type, args=args)
+    def order_book(self, symbol: Symbol, inst_type: InstrumentType, depth: int, cache_kwargs: dict = {}):
+        args = (symbol, depth)
+        return self._run_interface(
+            Interface.ORDER_BOOK, inst_type, *args, cache_kwargs=dict(self.cache_kwargs, **cache_kwargs)
+        )

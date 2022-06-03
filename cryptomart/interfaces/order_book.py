@@ -1,29 +1,47 @@
-import datetime
-import math
-from typing import Callable, Dict, List, Tuple
+from typing import Callable, Dict
 
-import numpy as np
 import pandas as pd
-from pyutil.cache import cached
-from requests import Request
 
-from ..enums import Instrument, InstrumentType, Interval, OHLCVColumn, Symbol
-from ..errors import MissingDataError, NotSupportedError
+from ..enums import OrderBookSchema, OrderBookSide, Symbol
 from ..interfaces.api import APIInterface
-from ..types import IntervalType, JSONDataType, TimeType
-from ..util import parse_time
+from ..util import Dispatcher
+
+
+def default_get_multiplier(dispatcher: Dispatcher, instrument_id: str, **cache_kwargs):
+    return 1
 
 
 class OrderBookInterface(APIInterface):
     def __init__(
         self,
-        prepare_request: Callable[[str, str, int], Request],
-        extract_data: Callable[[JSONDataType], pd.DataFrame],
+        instruments: Dict[Symbol, str],
+        get_multiplier: Callable[[Dispatcher, str], float] = default_get_multiplier,
         **api_interface_kwargs,
     ):
+        self.instruments = instruments
+        self.get_multiplier = get_multiplier
         super().__init__(**api_interface_kwargs)
-        self.prepare_request = prepare_request
-        self.extract_response = extract_data
-        
-    def run(self, symbol, depth=20) -> pd.DataFrame:
-        req = self.prepare_request(self.url, symbol, depth)
+
+    def run(self, symbol: Symbol, depth: int = 20, **cache_kwargs) -> pd.DataFrame:
+        instrument_id = self.instruments[symbol]
+        data = self.execute(self.dispatcher, self.url, instrument_id, depth)
+
+        data = data.astype({OrderBookSchema.price: float, OrderBookSchema.quantity: float})
+        data[OrderBookSchema.quantity] = data[OrderBookSchema.quantity] * self.get_multiplier(
+            self.dispatcher,
+            instrument_id,
+            cache_kwargs=cache_kwargs,
+        )
+
+        bids = (
+            data[data[OrderBookSchema.side] == OrderBookSide.bid]
+            .sort_values(OrderBookSchema.price, ascending=False, ignore_index=True)
+            .iloc[:depth]
+        )
+        asks = (
+            data[data[OrderBookSchema.side] == OrderBookSide.ask]
+            .sort_values(OrderBookSchema.price, ascending=True, ignore_index=True)
+            .iloc[:depth]
+        )
+        orderbook = pd.concat([bids, asks], ignore_index=True)
+        return orderbook

@@ -16,6 +16,7 @@ class OHLCVColumn(NameEnum):
 class Instrument(NameEnum):
     cryptomart_symbol = "cryptomart_symbol"
     exchange_symbol = "exchange_symbol"
+    listing_date = "listing_date"
 
 
 class OrderBookSchema(NameEnum):
