@@ -8,8 +8,7 @@ from cryptomart.interfaces.instrument_info import InstrumentInfoInterface
 from cryptomart.interfaces.order_book import OrderBookInterface
 from requests import Request
 
-from ..enums import (Instrument, InstrumentType, Interface, Interval,
-                     OrderBookSchema, OrderBookSide)
+from ..enums import Instrument, InstrumentType, Interface, Interval, OrderBookSchema, OrderBookSide
 from ..feeds import OHLCVColumn
 from ..interfaces.ohlcv import OHLCVInterface
 from ..types import IntervalType
@@ -17,38 +16,75 @@ from ..util import Dispatcher, dt_to_timestamp, parse_time
 from .base import ExchangeAPIBase
 
 
-def instrument_info_perp(dispatcher: Dispatcher, url: str) -> pd.DataFrame:
+def instrument_info(dispatcher: Dispatcher, url: str) -> pd.DataFrame:
     request = Request("GET", url)
     response = dispatcher.send_request(request)
 
-    data = response["symbols"]
+    data = response["result"]
 
     data = pd.DataFrame(data)
     data = data[data.status == "TRADING"]
-    data = data[data.quoteAsset == "USDT"]
-    data = data[data.contractType == "PERPETUAL"]
 
-    data[Instrument.cryptomart_symbol] = data["baseAsset"]
-    data[Instrument.exchange_symbol] = data["symbol"]
+    # filter out symbols that end in a number
+    data = data[data.name.apply(lambda e: e[-1] not in [str(x) for x in range(0, 9)])]
+    data = data[data.quote_currency == "USDT"]
+
+    data[Instrument.cryptomart_symbol] = data["base_currency"]
+    data[Instrument.exchange_symbol] = data["name"]
     return data
 
 
-def instrument_info_spot(dispatcher: Dispatcher, url: str) -> pd.DataFrame:
-    request = Request("GET", url)
-    response = dispatcher.send_request(request)
+def ohlcv_perp(
+    dispatcher: Dispatcher,
+    url: str,
+    instrument_id: str,
+    interval_id: IntervalType,
+    starttimes: List[datetime.datetime],
+    endtimes: List[datetime.datetime],
+    limits: List[int],
+) -> pd.DataFrame:
+    col_map = {
+        "open_time": OHLCVColumn.open_time,
+        "open": OHLCVColumn.open,
+        "high": OHLCVColumn.high,
+        "low": OHLCVColumn.low,
+        "close": OHLCVColumn.close,
+        "volume": OHLCVColumn.volume,
+    }
 
-    data = response["symbols"]
+    reqs = []
+    for starttime, endtime, limit in zip(starttimes, endtimes, limits):
+        req = Request(
+            "GET",
+            url,
+            params={
+                "symbol": instrument_id,
+                "interval": interval_id,
+                "from": dt_to_timestamp(starttime, seconds=True),
+                "limit": limit,
+            },
+        )
+        reqs.append(req)
 
-    data = pd.DataFrame(data)
-    data = data[data.status == "TRADING"]
-    data = data[data.quoteAsset == "USDT"]
+    responses = dispatcher.send_requests(reqs)
+    out = pd.DataFrame(columns=col_map.values())
 
-    data[Instrument.cryptomart_symbol] = data["baseAsset"]
-    data[Instrument.exchange_symbol] = data["symbol"]
-    return data
+    for res in responses:
+        if res["ret_msg"] != "OK":
+            raise Exception(res["ret_msg"])
+
+        res = res["result"]
+        if len(res) == 0:
+            return out
+        data: pd.DataFrame = pd.DataFrame(data)
+        data.rename(columns=col_map, inplace=True)
+        data = data[col_map.values()]
+        out = pd.concat([out, data], ignore_index=True)
+    out[OHLCVColumn.open_time] = out[OHLCVColumn.open_time].astype(int)
+    return out.sort_values(OHLCVColumn.open_time, ascending=True)
 
 
-def ohlcv(
+def ohlcv_spot(
     dispatcher: Dispatcher,
     url: str,
     instrument_id: str,
@@ -74,8 +110,8 @@ def ohlcv(
             params={
                 "symbol": instrument_id,
                 "interval": interval_id,
-                "startTime": dt_to_timestamp(starttime, milliseconds=True),
-                "endTime": dt_to_timestamp(endtime, milliseconds=True),
+                "startTime": dt_to_timestamp(starttime, seconds=True),
+                "endTime": dt_to_timestamp(endtime, seconds=True),
                 "limit": limit,
             },
         )
@@ -85,10 +121,12 @@ def ohlcv(
     out = pd.DataFrame(columns=col_map.values())
 
     for res in responses:
-        if isinstance(res, dict) and "code" in res:
-            raise Exception(res["msg"])
+        if res["ret_msg"] != "OK":
+            raise Exception(res["ret_msg"])
+
+        res = res["result"]
         if len(res) == 0:
-            continue
+            return out
         data = np.array(res)[:, list(col_map.keys())]
         data = pd.DataFrame(data, columns=list(col_map.values()))
         out = pd.concat([out, data], ignore_index=True)
@@ -102,41 +140,38 @@ def order_book(dispatcher: Dispatcher, url: str, instrument_name: str, depth: in
         url,
         params={
             "symbol": instrument_name,
-            "limit": depth,
         },
     )
 
     response = dispatcher.send_request(request)
 
-    if isinstance(response, dict) and "code" in response:
-        raise Exception(response["msg"])
-    bids = pd.DataFrame(response["bids"], columns=[OrderBookSchema.price, OrderBookSchema.quantity]).assign(
-        **{OrderBookSchema.side: OrderBookSide.bid}
+    if response["result"] == None:
+        raise Exception("No data for this symbol")
+
+    orderbook = (
+        pd.DataFrame(response["result"])
+        .drop(columns=["symbol"])
+        .reindex(columns=[OrderBookSchema.price, "size", OrderBookSchema.side])
+        .rename(columns={"size": OrderBookSchema.quantity})
+        .replace(["Sell", "Buy"], [OrderBookSide.ask, OrderBookSide.bid])
+        .assign(**{OrderBookSchema.timestamp: datetime.datetime.utcnow()})
     )
-    asks = pd.DataFrame(response["asks"], columns=[OrderBookSchema.price, OrderBookSchema.quantity]).assign(
-        **{OrderBookSchema.side: OrderBookSide.ask}
-    )
-    orderbook = bids.merge(asks, how="outer").assign(**{OrderBookSchema.timestamp: datetime.datetime.utcnow()})
-    orderbook[OrderBookSchema.timestamp] = orderbook[OrderBookSchema.timestamp].apply(lambda e: parse_time(e))
     return orderbook
 
 
-class Binance(ExchangeAPIBase):
+class Bybit(ExchangeAPIBase):
 
-    name = "binance"
-    futures_base_url = "https://fapi.binance.com"
-    spot_base_url = "https://api.binance.com"
+    name = "bybit"
+    base_url = "https://api.bybit.com"
 
     intervals = {
-        Interval.interval_1m: ("1m", datetime.timedelta(minutes=1)),
-        Interval.interval_5m: ("5m", datetime.timedelta(minutes=5)),
-        Interval.interval_15m: ("15m", datetime.timedelta(minutes=15)),
-        Interval.interval_1h: ("1h", datetime.timedelta(hours=1)),
-        Interval.interval_4h: ("4h", datetime.timedelta(hours=4)),
-        Interval.interval_8h: ("8h", datetime.timedelta(hours=8)),
-        Interval.interval_12h: ("12h", datetime.timedelta(hours=12)),
-        Interval.interval_1d: ("1d", datetime.timedelta(days=1)),
-        Interval.interval_1w: ("1w", datetime.timedelta(weeks=1)),
+        Interval.interval_1m: (1, datetime.timedelta(minutes=1)),
+        Interval.interval_5m: (5, datetime.timedelta(minutes=5)),
+        Interval.interval_15m: (15, datetime.timedelta(minutes=15)),
+        Interval.interval_1h: (60, datetime.timedelta(hours=1)),
+        Interval.interval_4h: (240, datetime.timedelta(hours=4)),
+        Interval.interval_12h: (720, datetime.timedelta(hours=12)),
+        Interval.interval_1d: ("D", datetime.timedelta(days=1)),
     }
 
     def __init__(self, cache_kwargs={"disabled": False, "refresh": False}):
@@ -148,6 +183,7 @@ class Binance(ExchangeAPIBase):
         self.init_order_book_interface()
 
     def init_dispatchers(self):
+        # Check which endpoints employ a limit
         self.logger.debug("initializing dispatchers")
         self.perpetual_dispatcher = Dispatcher(f"{self.name}.dispatcher.perpetual", timeout=1 / 4)
         self.spot_dispatcher = Dispatcher(f"{self.name}.dispatcher.spot", timeout=1 / 2)

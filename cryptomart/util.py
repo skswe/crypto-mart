@@ -29,11 +29,13 @@ def parse_time(time: TimeType) -> datetime.datetime:
         return datetime.datetime.fromisoformat(time.replace("Z", "")).replace(tzinfo=datetime.timezone.utc)
 
 
-def dt_to_timestamp(dt: datetime.datetime, string=False, seconds=False, milliseconds=False):
-    if seconds:
+def dt_to_timestamp(dt: datetime.datetime, string=False, granularity="seconds"):
+    if granularity == "seconds":
         coeff = 1
-    elif milliseconds:
+    elif granularity == "milliseconds":
         coeff = 1000
+    else:
+        raise ValueError(f"Invalid granularity provided: {granularity}")
 
     if string:
         return dt.strftime("%Y-%m-%d")

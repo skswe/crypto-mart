@@ -1,6 +1,7 @@
 import datetime
 import os
 from typing import List
+from black import json
 
 import numpy as np
 import pandas as pd
@@ -8,8 +9,7 @@ from cryptomart.interfaces.instrument_info import InstrumentInfoInterface
 from cryptomart.interfaces.order_book import OrderBookInterface
 from requests import Request
 
-from ..enums import (Instrument, InstrumentType, Interface, Interval,
-                     OrderBookSchema, OrderBookSide)
+from ..enums import Instrument, InstrumentType, Interface, Interval, OrderBookSchema, OrderBookSide
 from ..feeds import OHLCVColumn
 from ..interfaces.ohlcv import OHLCVInterface
 from ..types import IntervalType
@@ -18,33 +18,38 @@ from .base import ExchangeAPIBase
 
 
 def instrument_info_perp(dispatcher: Dispatcher, url: str) -> pd.DataFrame:
-    request = Request("GET", url)
+    filter = {
+        "typ": "FFWCSX",
+        "state": "Open",
+        "quoteCurrency": "USDT",
+    }
+
+    request = Request("GET", url, params={"filter": json.dumps(filter)})
     response = dispatcher.send_request(request)
 
-    data = response["symbols"]
+    data = pd.DataFrame(response)
 
-    data = pd.DataFrame(data)
-    data = data[data.status == "TRADING"]
-    data = data[data.quoteAsset == "USDT"]
-    data = data[data.contractType == "PERPETUAL"]
-
-    data[Instrument.cryptomart_symbol] = data["baseAsset"]
+    data[Instrument.cryptomart_symbol] = data["underlying"]
     data[Instrument.exchange_symbol] = data["symbol"]
+
     return data
 
 
 def instrument_info_spot(dispatcher: Dispatcher, url: str) -> pd.DataFrame:
-    request = Request("GET", url)
+    filter = {
+        "typ": "IFXXXP",
+        "state": "Open",
+        "quoteCurrency": "USDT",
+    }
+
+    request = Request("GET", url, params={"filter": json.dumps(filter)})
     response = dispatcher.send_request(request)
 
-    data = response["symbols"]
+    data = pd.DataFrame(response)
 
-    data = pd.DataFrame(data)
-    data = data[data.status == "TRADING"]
-    data = data[data.quoteAsset == "USDT"]
-
-    data[Instrument.cryptomart_symbol] = data["baseAsset"]
+    data[Instrument.cryptomart_symbol] = data["underlying"]
     data[Instrument.exchange_symbol] = data["symbol"]
+
     return data
 
 
@@ -58,12 +63,12 @@ def ohlcv(
     limits: List[int],
 ) -> pd.DataFrame:
     col_map = {
-        0: OHLCVColumn.open_time,
-        1: OHLCVColumn.open,
-        2: OHLCVColumn.high,
-        3: OHLCVColumn.low,
-        4: OHLCVColumn.close,
-        5: OHLCVColumn.volume,
+        "timestamp": OHLCVColumn.open_time,
+        "open": OHLCVColumn.open,
+        "high": OHLCVColumn.high,
+        "low": OHLCVColumn.low,
+        "close": OHLCVColumn.close,
+        "volume": OHLCVColumn.volume,
     }
 
     reqs = []
@@ -85,12 +90,13 @@ def ohlcv(
     out = pd.DataFrame(columns=col_map.values())
 
     for res in responses:
-        if isinstance(res, dict) and "code" in res:
-            raise Exception(res["msg"])
+        if isinstance(res, dict):
+            raise Exception(res["error"]["message"])
         if len(res) == 0:
             continue
-        data = np.array(res)[:, list(col_map.keys())]
-        data = pd.DataFrame(data, columns=list(col_map.values()))
+        data: pd.DataFrame = pd.DataFrame(data)
+        data.rename(columns=col_map, inplace=True)
+        data = data[col_map.values()]
         out = pd.concat([out, data], ignore_index=True)
     out[OHLCVColumn.open_time] = out[OHLCVColumn.open_time].astype(int)
     return out.sort_values(OHLCVColumn.open_time, ascending=True)

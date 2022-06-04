@@ -1,10 +1,10 @@
 import importlib
 import logging
-from datetime import datetime, timedelta
+from datetime import datetime
 
 import numpy as np
 import pytest
-from cryptomart.enums import Exchange, Instrument, InstrumentType, Interval, OrderBookSchema, OrderBookSide, Symbol
+from cryptomart.enums import Exchange, InstrumentType, Interval, OrderBookSchema, OrderBookSide, Symbol
 from cryptomart.errors import NotSupportedError
 from cryptomart.exchanges.base import ExchangeAPIBase
 from cryptomart.util import parse_time
@@ -81,26 +81,3 @@ def test_orderbook(exchange: ExchangeAPIBase, symbol: Symbol, inst_type: Instrum
 
     assert (bids == correct_bids).all(axis=None)
     assert (asks == correct_asks).all(axis=None)
-
-
-@pytest.mark.parametrize("inst_type", [InstrumentType.PERPETUAL, InstrumentType.SPOT])
-@pytest.mark.requires_http
-def test_listing_dates_accurate(exchange: ExchangeAPIBase, inst_type: InstrumentType):
-    listing_dates = exchange.instrument_info(inst_type)[[Instrument.cryptomart_symbol, Instrument.listing_date]]
-    for idx, row in listing_dates.iterrows():
-        if row.listing_date == np.nan:
-            exchange.logger.warning(f"nan listing for {row.cryptomart_symbol}")
-            continue
-        try:
-            df = exchange.ohlcv(
-                row.cryptomart_symbol,
-                inst_type,
-                Interval.interval_1d,
-                parse_time(row.listing_date),
-                parse_time(row.listing_date) + timedelta(days=7),
-            )
-            exchange.logger.warning(
-                f"listing_date was {row.listing_date} but first open_time was {df.iloc[0].open_time}"
-            )
-        except NotSupportedError:
-            continue

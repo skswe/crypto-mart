@@ -1,18 +1,16 @@
 import datetime
 import math
 import os
-from typing import Callable, Dict, List, Tuple
+from typing import Dict, List, Tuple
 
 import numpy as np
 import pandas as pd
 from pyutil.cache import cached
-from regex import D
-from requests import Request
 
 from ..enums import Interval, OHLCVColumn, Symbol
 from ..errors import MissingDataError, NotSupportedError
 from ..interfaces.api import APIInterface
-from ..types import IntervalType, JSONDataType, TimeType
+from ..types import IntervalType, TimeType
 from ..util import parse_time
 
 
@@ -126,40 +124,6 @@ class OHLCVInterface(APIInterface):
                     self.logger.warning(msg)
 
         return data
-
-    # @cached("/tmp/cache/listing", is_method=True, instance_identifiers=["name"])
-    # def get_instrument_listing(
-    #     self,
-    #     symbol: Symbol,
-    #     inst_type: InstrumentType,
-    #     cache_kwargs={},
-    # ):
-    #     """Return listing for a given instrument"""
-    #     self.logger.info(f"Getting listing for {self.name}_earliest_{inst_type}_{symbol}")
-
-    #     interval = Interval.interval_1d
-    #     starttime = datetime.datetime(2018, 1, 1)
-    #     endtime = datetime.datetime.now()
-    #     symbol_name = self.get_instrument(symbol, inst_type)[Instrument.contract_name]
-    #     interval_name, timedelta = self.intervals[interval]
-
-    #     df = self._ohlcv(
-    #         symbol_name,
-    #         inst_type,
-    #         interval_name,
-    #         starttime,
-    #         endtime,
-    #         timedelta,
-    #         exit_on_first_response=True,
-    #         min_datapoints_required=5,
-    #         strict=False,
-    #         # Do not cache at ohlcv level
-    #         cache_kwargs={"disabled": True, "refresh": False},
-    #     )
-
-    #     ret_val = df[~df.open.isna()].iloc[0][OHLCVColumn.open_time].to_pydatetime()
-
-    #     return ret_val
 
     def get_request_intervals(
         self,

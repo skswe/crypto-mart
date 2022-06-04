@@ -1,13 +1,11 @@
 import os
-from typing import Callable, Dict, Union
+from typing import Dict, Union
 
 import pandas as pd
 from pyutil.cache import cached
-from requests import Request
 
 from ..enums import Instrument, Symbol
 from ..interfaces.api import APIInterface
-from ..types import JSONDataType
 
 
 class InstrumentInfoInterface(APIInterface):

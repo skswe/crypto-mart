@@ -3,7 +3,7 @@ from typing import Any, Callable
 
 from cryptomart.exchanges.base import ExchangeAPIBase
 
-from ..enums import Exchange, InstrumentType, Interface, Symbol
+from ..enums import InstrumentType, Interface
 from ..util import Dispatcher
 
 
