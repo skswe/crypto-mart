@@ -7,7 +7,7 @@ import numpy as np
 import pandas as pd
 from pyutil.cache import cached
 
-from ..enums import Interval, OHLCVColumn, Symbol
+from ..enums import Instrument, Interval, OHLCVColumn, Symbol
 from ..errors import MissingDataError, NotSupportedError
 from ..interfaces.api import APIInterface
 from ..types import IntervalType, TimeType
@@ -19,7 +19,6 @@ class OHLCVInterface(APIInterface):
 
     def __init__(
         self,
-        instruments: Dict[Symbol, str],
         intervals: Dict[Interval, IntervalType],
         start_inclusive: bool,
         end_inclusive: bool,
@@ -30,7 +29,6 @@ class OHLCVInterface(APIInterface):
         """Initialize the interface
 
         Args:
-            instruments (Dict[Symbol, str]): Mapping of `Symbol` enum to API instrument ID for this interface
             intervals (Dict[Interval, IntervalType]): Mapping of `Interval` enum to API interval ID for the interface
             start_inclusive (bool): `True` if the first open_time returned will match starttime parameter
             end_inclusive (bool): `True` if the last open_time returned will match endtime parameter
@@ -43,7 +41,7 @@ class OHLCVInterface(APIInterface):
                 value of `strict` in the function call, either a warning will be logged or an exception will be raised. Defaults to 1.
         """
         super().__init__(**api_interface_kwargs)
-        self.instruments = instruments
+        self.instruments = self.exchange.instrument_info(self.inst_type, map_column=Instrument.exchange_symbol)
         self.intervals = intervals
         self.start_inclusive = start_inclusive
         self.end_inclusive = end_inclusive
@@ -73,8 +71,8 @@ class OHLCVInterface(APIInterface):
             endtime (TimeType): Time of the last close
             strict (bool): If `True`, raises an exception when missing data is above threshold
         Raises:
-            NotSupportedError: _description_
-            MissingDataError: _description_
+            NotSupportedError: If the given symbol, interval are not supported by the API
+            MissingDataError: If data does not meet self.valid_data_threshold and `strict=True`.
 
         Returns:
             pd.DataFrame: OHLCV dataframe
@@ -101,7 +99,7 @@ class OHLCVInterface(APIInterface):
 
         # Fill missing rows / remove extra rows
         # remove the last index since we only care about open_time
-        expected_index = pd.period_range(starttime, endtime, freq=timedelta)[:-1].to_timestamp()
+        expected_index = pd.date_range(starttime, endtime, freq=timedelta)[:-1]
 
         # Drop duplicate open_time axis
         data = data.groupby(OHLCVColumn.open_time).first()
@@ -184,7 +182,7 @@ class OHLCVInterface(APIInterface):
         # the time grid is the sequence of `interval`'s since the time origin, starting at the origin
         # e.g. if `interval` is 1 day then the time grid is (1, 1, 1, 0, 0), (1, 2, 1, 0, 0), (1, 3, 1, 0, 0) ...
         # remainder is the amount of time past a datetime in the time grid
-        time_min = datetime.datetime.min.replace(tzinfo=datetime.timezone.utc)
+        time_min = datetime.datetime.min
 
         remainder = (a - time_min) % interval
         if remainder > datetime.timedelta(0):
@@ -201,3 +199,26 @@ class OHLCVInterface(APIInterface):
             endtime = b
 
         return starttime, endtime
+
+    @classmethod
+    def format_responses(
+        cls, responses, data_attrs, code_attrs, expected_code, err_msg_attrs, col_map
+    ) -> pd.DataFrame:
+        """Automatically handle list of ohlcv python parsed JSON responses"""
+        out = pd.DataFrame(columns=col_map.values())
+        for res in responses:
+            try:
+                df = cls.handle_response(res, data_attrs, code_attrs, expected_code, err_msg_attrs, col_map)
+                out = pd.concat([out, df], ignore_index=True)
+            except MissingDataError:
+                continue
+        return out.sort_values(OHLCVColumn.open_time, ascending=True)
+
+    @staticmethod
+    def parse_response(res: dict, col_map: dict) -> pd.DataFrame:
+        """Format API response to standard dataframe"""
+        df = pd.DataFrame(res)
+        if df.empty:
+            raise MissingDataError
+        df.rename(columns=col_map, inplace=True)
+        return df[col_map.values()]

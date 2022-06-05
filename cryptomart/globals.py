@@ -7,3 +7,6 @@ LOGGING_FORMATTER = logging.Formatter("{levelname:<8} {name:<50}{funcName:>35}:{
 EARLIEST_OHLCV_DATE = datetime.datetime(2018, 1, 1)
 END_OHLCV_DATE = datetime.datetime(2022, 3, 11)
 INVALID_DATE = datetime.datetime(1980, 1, 1)
+SYMBOL_ALIASES = {
+    Symbol.XBT: Symbol.BTC,
+}

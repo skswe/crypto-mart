@@ -2,7 +2,6 @@ import datetime
 import logging
 import threading
 import time
-from multiprocessing.sharedctypes import Value
 from queue import Queue
 from typing import Callable, List, Union
 
@@ -12,21 +11,30 @@ import requests
 from .types import TimeType
 
 
+def int_to_dt(time: int):
+    for denominator in [1, 1e3, 1e6]:
+        try:
+            return datetime.datetime.utcfromtimestamp(time / denominator).replace(tzinfo=None)
+        except (ValueError, AttributeError):
+            continue
+
 def parse_time(time: TimeType) -> datetime.datetime:
     if isinstance(time, pd.Timestamp):
-        return time.to_pydatetime()
-    if isinstance(time, int) or isinstance(time, float):
-        for denominator in [1, 1e3, 1e6]:
-            try:
-                return datetime.datetime.utcfromtimestamp(time / denominator)
-            except (ValueError, AttributeError):
-                continue
+        return time.to_pydatetime().replace(tzinfo=None)
+    elif isinstance(time, int) or isinstance(time, float):
+        return int_to_dt(time)
     elif isinstance(time, datetime.datetime):
-        return time.replace(tzinfo=datetime.timezone.utc)
+        return time.replace(tzinfo=None)
     elif isinstance(time, tuple):
-        return datetime.datetime(*time, tzinfo=datetime.timezone.utc)
+        return datetime.datetime(*time, tzinfo=None)
     elif isinstance(time, str):
-        return datetime.datetime.fromisoformat(time.replace("Z", "")).replace(tzinfo=datetime.timezone.utc)
+        try:
+            # time is an string literal integer
+            time = int(time) # raises ValueError if it cant convert to int
+            return int_to_dt(time)
+        except ValueError:
+            # time is a string time format
+            return pd.to_datetime(time).to_pydatetime().replace(tzinfo=None)        
 
 
 def dt_to_timestamp(dt: datetime.datetime, string=False, granularity="seconds"):
@@ -38,9 +46,9 @@ def dt_to_timestamp(dt: datetime.datetime, string=False, granularity="seconds"):
         raise ValueError(f"Invalid granularity provided: {granularity}")
 
     if string:
-        return dt.strftime("%Y-%m-%d")
+        return dt.replace(tzinfo=datetime.timezone.utc).strftime("%Y-%m-%d %H:%M:%S")
     else:
-        return int(dt.timestamp() * coeff)
+        return int(dt.replace(tzinfo=datetime.timezone.utc).timestamp() * coeff)
 
 
 def show_df(df, max_rows=None, max_columns=None, width=1000):

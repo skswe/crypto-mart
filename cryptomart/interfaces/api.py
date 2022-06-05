@@ -1,6 +1,8 @@
 import logging
 from typing import Any, Callable
 
+import pandas as pd
+from cryptomart.errors import APIError
 from cryptomart.exchanges.base import ExchangeAPIBase
 
 from ..enums import InstrumentType, Interface
@@ -50,3 +52,39 @@ class APIInterface:
     def log_level(self, level):
         self.logger.setLevel(level)
         self.dispatcher.logger.setLevel(level)
+
+    @classmethod
+    def handle_response(cls, response, data_attrs, code_attrs, expected_code, err_msg_attrs, *args) -> pd.DataFrame:
+        """Automatically handle python parsed JSON response"""
+        if code_attrs:
+            # Check for provided code response
+            code_response = response
+            for attr in code_attrs:
+                code_response = code_response[attr]
+
+            # Check code response matches expected value
+            if code_response != expected_code:
+                # Read error message
+                err_response = response
+                for attr in err_msg_attrs:
+                    err_response = err_response[attr]
+                raise APIError(err_response)
+
+        data_response = response
+        for attr in data_attrs:
+            data_response = data_response[attr]
+        try:
+            data_response = cls.parse_response(data_response, *args)
+        except KeyError as e:
+            # Try to extract error message when unexpected error occurs. else just raise the error
+            try:
+                err_response = response
+                for attr in err_msg_attrs:
+                    err_response = err_response[attr]
+                if isinstance(err_response, str):
+                    raise APIError(err_response)
+                raise e
+            except KeyError:
+                raise e
+
+        return data_response

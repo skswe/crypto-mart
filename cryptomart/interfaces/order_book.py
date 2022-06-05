@@ -1,37 +1,40 @@
-from typing import Callable, Dict
+from datetime import datetime
 
 import pandas as pd
+from cryptomart.errors import MissingDataError
 
-from ..enums import OrderBookSchema, OrderBookSide, Symbol
+from ..enums import Instrument, OrderBookSchema, OrderBookSide, Symbol
 from ..interfaces.api import APIInterface
-from ..util import Dispatcher
-
-
-def default_get_multiplier(dispatcher: Dispatcher, instrument_id: str, **cache_kwargs):
-    return 1
 
 
 class OrderBookInterface(APIInterface):
     def __init__(
         self,
-        instruments: Dict[Symbol, str],
-        get_multiplier: Callable[[Dispatcher, str], float] = default_get_multiplier,
         **api_interface_kwargs,
     ):
-        self.instruments = instruments
-        self.get_multiplier = get_multiplier
         super().__init__(**api_interface_kwargs)
+        self.instruments = self.exchange.instrument_info(self.inst_type, map_column=Instrument.exchange_symbol)
+        self.multipliers = self.exchange.instrument_info(self.inst_type, map_column=Instrument.orderbook_multi)
 
-    def run(self, symbol: Symbol, depth: int = 20, **cache_kwargs) -> pd.DataFrame:
+    def run(self, symbol: Symbol, depth: int, **cache_kwargs) -> pd.DataFrame:
+        """Run main interface function
+
+        Args:
+            symbol (Symbol): Symbol to query
+            depth (int): Number of bids/asks to include in the snapshot
+
+        Returns:
+            pd.DataFrame: Orderbook
+        """
         instrument_id = self.instruments[symbol]
+        multiplier = self.multipliers[symbol]
         data = self.execute(self.dispatcher, self.url, instrument_id, depth)
 
-        data = data.astype({OrderBookSchema.price: float, OrderBookSchema.quantity: float})
-        data[OrderBookSchema.quantity] = data[OrderBookSchema.quantity] * self.get_multiplier(
-            self.dispatcher,
-            instrument_id,
-            cache_kwargs=cache_kwargs,
-        )
+        data[[OrderBookSchema.price, OrderBookSchema.quantity]] = data[
+            [OrderBookSchema.price, OrderBookSchema.quantity]
+        ].astype(float)
+
+        data[OrderBookSchema.quantity] = data[OrderBookSchema.quantity] * multiplier
 
         bids = (
             data[data[OrderBookSchema.side] == OrderBookSide.bid]
@@ -45,3 +48,23 @@ class OrderBookInterface(APIInterface):
         )
         orderbook = pd.concat([bids, asks], ignore_index=True)
         return orderbook
+
+    @staticmethod
+    def parse_response(res: dict, col_map: dict, split_keys: tuple) -> pd.DataFrame:
+        """Format API response to standard dataframe"""
+        if split_keys:
+            bid_key, ask_key = split_keys
+            bids = pd.DataFrame(res[bid_key])
+            asks = pd.DataFrame(res[ask_key])
+            df = pd.concat(
+                [bids, asks], keys=[OrderBookSide.bid, OrderBookSide.ask], names=[OrderBookSchema.side]
+            ).reset_index(level=0)
+        else:
+            df = pd.DataFrame(res)
+
+        if df.empty:
+            raise MissingDataError
+
+        df.rename(columns=col_map, inplace=True)
+        df[OrderBookSchema.timestamp] = datetime.utcnow().replace(microsecond=0)
+        return df[OrderBookSchema._values()]

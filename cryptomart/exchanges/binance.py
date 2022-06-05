@@ -2,50 +2,47 @@ import datetime
 import os
 from typing import List
 
-import numpy as np
 import pandas as pd
 from cryptomart.interfaces.instrument_info import InstrumentInfoInterface
 from cryptomart.interfaces.order_book import OrderBookInterface
 from requests import Request
 
-from ..enums import (Instrument, InstrumentType, Interface, Interval,
-                     OrderBookSchema, OrderBookSide)
+from ..enums import Instrument, InstrumentType, Interface, Interval, OrderBookSchema
 from ..feeds import OHLCVColumn
 from ..interfaces.ohlcv import OHLCVInterface
 from ..types import IntervalType
-from ..util import Dispatcher, dt_to_timestamp, parse_time
+from ..util import Dispatcher, dt_to_timestamp
 from .base import ExchangeAPIBase
 
 
 def instrument_info_perp(dispatcher: Dispatcher, url: str) -> pd.DataFrame:
+    col_map = {
+        "baseAsset": Instrument.cryptomart_symbol,
+        "symbol": Instrument.exchange_symbol,
+        "onboardDate": Instrument.exchange_list_time,
+    }
     request = Request("GET", url)
     response = dispatcher.send_request(request)
 
-    data = response["symbols"]
-
-    data = pd.DataFrame(data)
-    data = data[data.status == "TRADING"]
-    data = data[data.quoteAsset == "USDT"]
-    data = data[data.contractType == "PERPETUAL"]
-
-    data[Instrument.cryptomart_symbol] = data["baseAsset"]
-    data[Instrument.exchange_symbol] = data["symbol"]
-    return data
+    df = InstrumentInfoInterface.handle_response(response, ["symbols"], [], None, [], col_map)
+    df = df[df.status == "TRADING"]
+    df = df[df.quoteAsset == "USDT"]
+    df = df[df.contractType == "PERPETUAL"]
+    return df
 
 
 def instrument_info_spot(dispatcher: Dispatcher, url: str) -> pd.DataFrame:
+    col_map = {
+        "baseAsset": Instrument.cryptomart_symbol,
+        "symbol": Instrument.exchange_symbol,
+    }
     request = Request("GET", url)
     response = dispatcher.send_request(request)
 
-    data = response["symbols"]
-
-    data = pd.DataFrame(data)
-    data = data[data.status == "TRADING"]
-    data = data[data.quoteAsset == "USDT"]
-
-    data[Instrument.cryptomart_symbol] = data["baseAsset"]
-    data[Instrument.exchange_symbol] = data["symbol"]
-    return data
+    df = InstrumentInfoInterface.handle_response(response, ["symbols"], [], None, [], col_map)
+    df = df[df.status == "TRADING"]
+    df = df[df.quoteAsset == "USDT"]
+    return df
 
 
 def ohlcv(
@@ -65,7 +62,6 @@ def ohlcv(
         4: OHLCVColumn.close,
         5: OHLCVColumn.volume,
     }
-
     reqs = []
     for starttime, endtime, limit in zip(starttimes, endtimes, limits):
         req = Request(
@@ -74,29 +70,22 @@ def ohlcv(
             params={
                 "symbol": instrument_id,
                 "interval": interval_id,
-                "startTime": dt_to_timestamp(starttime, milliseconds=True),
-                "endTime": dt_to_timestamp(endtime, milliseconds=True),
+                "startTime": dt_to_timestamp(starttime, granularity="milliseconds"),
+                "endTime": dt_to_timestamp(endtime, granularity="milliseconds"),
                 "limit": limit,
             },
         )
         reqs.append(req)
 
     responses = dispatcher.send_requests(reqs)
-    out = pd.DataFrame(columns=col_map.values())
-
-    for res in responses:
-        if isinstance(res, dict) and "code" in res:
-            raise Exception(res["msg"])
-        if len(res) == 0:
-            continue
-        data = np.array(res)[:, list(col_map.keys())]
-        data = pd.DataFrame(data, columns=list(col_map.values()))
-        out = pd.concat([out, data], ignore_index=True)
-    out[OHLCVColumn.open_time] = out[OHLCVColumn.open_time].astype(int)
-    return out.sort_values(OHLCVColumn.open_time, ascending=True)
+    return OHLCVInterface.format_responses(responses, [], [], None, [], col_map)
 
 
 def order_book(dispatcher: Dispatcher, url: str, instrument_name: str, depth: int = 20) -> pd.DataFrame:
+    col_map = {
+        0: OrderBookSchema.price,
+        1: OrderBookSchema.quantity,
+    }
     request = Request(
         "GET",
         url,
@@ -107,17 +96,7 @@ def order_book(dispatcher: Dispatcher, url: str, instrument_name: str, depth: in
     )
 
     response = dispatcher.send_request(request)
-
-    if isinstance(response, dict) and "code" in response:
-        raise Exception(response["msg"])
-    bids = pd.DataFrame(response["bids"], columns=[OrderBookSchema.price, OrderBookSchema.quantity]).assign(
-        **{OrderBookSchema.side: OrderBookSide.bid}
-    )
-    asks = pd.DataFrame(response["asks"], columns=[OrderBookSchema.price, OrderBookSchema.quantity]).assign(
-        **{OrderBookSchema.side: OrderBookSide.ask}
-    )
-    orderbook = bids.merge(asks, how="outer").assign(**{OrderBookSchema.timestamp: datetime.datetime.utcnow()})
-    orderbook[OrderBookSchema.timestamp] = orderbook[OrderBookSchema.timestamp].apply(lambda e: parse_time(e))
+    orderbook = OrderBookInterface.handle_response(response, [], [], None, [], col_map, ("bids", "asks"))
     return orderbook
 
 
@@ -139,11 +118,10 @@ class Binance(ExchangeAPIBase):
         Interval.interval_1w: ("1w", datetime.timedelta(weeks=1)),
     }
 
-    def __init__(self, cache_kwargs={"disabled": False, "refresh": False}):
-        super().__init__(cache_kwargs=cache_kwargs)
+    def __init__(self, cache_kwargs={"disabled": False, "refresh": False}, log_level: str = "DEBUG"):
+        super().__init__(cache_kwargs=cache_kwargs, log_level=log_level)
         self.init_dispatchers()
         self.init_instrument_info_interface()
-        self.init_instruments()
         self.init_ohlcv_interface()
         self.init_order_book_interface()
 
@@ -151,15 +129,6 @@ class Binance(ExchangeAPIBase):
         self.logger.debug("initializing dispatchers")
         self.perpetual_dispatcher = Dispatcher(f"{self.name}.dispatcher.perpetual", timeout=1 / 4)
         self.spot_dispatcher = Dispatcher(f"{self.name}.dispatcher.spot", timeout=1 / 2)
-
-    def init_instruments(self):
-        self.logger.debug("Loading instrument mappings")
-        self.perpetual_instruments = self.interfaces[Interface.INSTRUMENT_INFO][InstrumentType.PERPETUAL].run(
-            mappings=True, cache_kwargs=self.cache_kwargs
-        )
-        self.spot_instruments = self.interfaces[Interface.INSTRUMENT_INFO][InstrumentType.SPOT].run(
-            mappings=True, cache_kwargs=self.cache_kwargs
-        )
 
     def init_instrument_info_interface(self):
         perpetual = InstrumentInfoInterface(
@@ -187,9 +156,8 @@ class Binance(ExchangeAPIBase):
 
     def init_ohlcv_interface(self):
         perpetual = OHLCVInterface(
-            instruments=self.perpetual_instruments,
             intervals=self.intervals,
-            start_inclusive=False,
+            start_inclusive=True,
             end_inclusive=True,
             max_response_limit=1500,
             exchange=self,
@@ -201,7 +169,6 @@ class Binance(ExchangeAPIBase):
         )
 
         spot = OHLCVInterface(
-            instruments=self.spot_instruments,
             intervals=self.intervals,
             start_inclusive=True,
             end_inclusive=True,
@@ -221,7 +188,6 @@ class Binance(ExchangeAPIBase):
 
     def init_order_book_interface(self):
         perpetual = OrderBookInterface(
-            instruments=self.perpetual_instruments,
             exchange=self,
             interface_name=Interface.ORDER_BOOK,
             inst_type=InstrumentType.PERPETUAL,
@@ -231,7 +197,6 @@ class Binance(ExchangeAPIBase):
         )
 
         spot = OrderBookInterface(
-            instruments=self.spot_instruments,
             exchange=self,
             interface_name=Interface.ORDER_BOOK,
             inst_type=InstrumentType.SPOT,

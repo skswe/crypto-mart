@@ -1,6 +1,6 @@
 import logging
 
-# from .client import Client
+from .client import Client
 from .enums import Exchange, InstrumentType, Interval, Symbol
 from .exchanges.base import ExchangeAPIBase
 from .feeds import OHLCVFeed

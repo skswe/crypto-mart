@@ -1,45 +1,61 @@
 import datetime
-import logging
 import os
+from typing import List
 
 import pandas as pd
-from cryptomart.feeds import OHLCVColumn
+from cryptomart.interfaces.instrument_info import InstrumentInfoInterface
+from cryptomart.interfaces.order_book import OrderBookInterface
 from requests import Request
 
-from ..enums import InstrumentType, Interval, OrderBookSchema, OrderBookSide
+from ..enums import Instrument, InstrumentType, Interface, Interval, OrderBookSchema, OrderBookSide
+from ..feeds import OHLCVColumn
+from ..interfaces.ohlcv import OHLCVInterface
+from ..types import IntervalType
+from ..util import Dispatcher, dt_to_timestamp
 from .base import ExchangeAPIBase
-from .instrument_names.bybit import instrument_names as bybit_instrument_names
-
-logger = logging.getLogger(__name__)
 
 
-class Bybit(ExchangeAPIBase):
-
-    name = "bybit"
-
-    instrument_names = {**bybit_instrument_names}
-
-    intervals = {
-        Interval.interval_1m: (1, datetime.timedelta(minutes=1)),
-        Interval.interval_3m: (3, datetime.timedelta(minutes=3)),
-        Interval.interval_5m: (5, datetime.timedelta(minutes=5)),
-        Interval.interval_15m: (15, datetime.timedelta(minutes=15)),
-        Interval.interval_30m: (30, datetime.timedelta(minutes=30)),
-        Interval.interval_1h: (60, datetime.timedelta(hours=1)),
-        Interval.interval_2h: (120, datetime.timedelta(hours=2)),
-        Interval.interval_4h: (240, datetime.timedelta(hours=4)),
-        Interval.interval_6h: (360, datetime.timedelta(hours=6)),
-        Interval.interval_12h: (720, datetime.timedelta(hours=12)),
-        Interval.interval_1d: ("D", datetime.timedelta(days=1)),
+def instrument_info_perp(dispatcher: Dispatcher, url: str) -> pd.DataFrame:
+    col_map = {
+        "base_currency": Instrument.cryptomart_symbol,
+        "name": Instrument.exchange_symbol,
     }
+    request = Request("GET", url)
+    response = dispatcher.send_request(request)
+    df = InstrumentInfoInterface.handle_response(response, ["result"], ["ret_code"], 0, ["ret_msg"], col_map)
+    df = df[df.status == "Trading"]
 
-    _base_url = "https://api.bybit.com"
-    _max_requests_per_second = 40
-    _limit = 200
-    _start_inclusive = True
-    _end_inclusive = False
+    # filter out symbols that end in a number
+    df = df[df.name.apply(lambda e: e[-1] not in [str(x) for x in range(0, 9)])]
+    df = df[df.quote_currency == "USDT"]
+    return df
 
-    _ohlcv_column_map = {
+
+def instrument_info_spot(dispatcher: Dispatcher, url: str) -> pd.DataFrame:
+    col_map = {
+        "baseCurrency": Instrument.cryptomart_symbol,
+        "name": Instrument.exchange_symbol,
+    }
+    request = Request("GET", url)
+    response = dispatcher.send_request(request)
+    df = InstrumentInfoInterface.handle_response(response, ["result"], ["ret_code"], 0, ["ret_msg"], col_map)
+
+    # filter out symbols that end in a number
+    df = df[df.name.apply(lambda e: e[-1] not in [str(x) for x in range(0, 9)])]
+    df = df[df.quoteCurrency == "USDT"]
+    return df
+
+
+def ohlcv_perp(
+    dispatcher: Dispatcher,
+    url: str,
+    instrument_id: str,
+    interval_id: IntervalType,
+    starttimes: List[datetime.datetime],
+    endtimes: List[datetime.datetime],
+    limits: List[int],
+) -> pd.DataFrame:
+    col_map = {
         "open_time": OHLCVColumn.open_time,
         "open": OHLCVColumn.open,
         "high": OHLCVColumn.high,
@@ -47,8 +63,34 @@ class Bybit(ExchangeAPIBase):
         "close": OHLCVColumn.close,
         "volume": OHLCVColumn.volume,
     }
+    reqs = []
+    for starttime, endtime, limit in zip(starttimes, endtimes, limits):
+        req = Request(
+            "GET",
+            url,
+            params={
+                "symbol": instrument_id,
+                "interval": interval_id,
+                "from": dt_to_timestamp(starttime, granularity="seconds"),
+                "limit": limit,
+            },
+        )
+        reqs.append(req)
 
-    _ohlcv_column_map_spot = {
+    responses = dispatcher.send_requests(reqs)
+    return OHLCVInterface.format_responses(responses, ["result"], ["ret_code"], 0, ["ret_msg"], col_map)
+
+
+def ohlcv_spot(
+    dispatcher: Dispatcher,
+    url: str,
+    instrument_id: str,
+    interval_id: IntervalType,
+    starttimes: List[datetime.datetime],
+    endtimes: List[datetime.datetime],
+    limits: List[int],
+) -> pd.DataFrame:
+    col_map = {
         0: OHLCVColumn.open_time,
         1: OHLCVColumn.open,
         2: OHLCVColumn.high,
@@ -56,93 +98,180 @@ class Bybit(ExchangeAPIBase):
         4: OHLCVColumn.close,
         5: OHLCVColumn.volume,
     }
-
-    def _ohlcv_prepare_request(self, symbol, inst_type, interval, starttime, endtime, limit):
-        if inst_type == InstrumentType.PERPETUAL:
-            url = "public/linear/kline"
-        elif inst_type == InstrumentType.SPOT:
-            url = "spot/quote/v1/kline"
-
-        if inst_type == InstrumentType.PERPETUAL:
-            params = {
-                "symbol": symbol,
-                "interval": interval,
-                "from": starttime,
-                "limit": limit,
-            }
-
-        elif inst_type == InstrumentType.SPOT:
-            params = {
-                "symbol": symbol,
-                "interval": interval,
-                "startTime": starttime,
-                "endTime": endtime,
-                "limit": limit,
-            }
-
-        request_url = os.path.join(self._base_url, url)
-        return Request("GET", request_url, params=params)
-
-    def _ohlcv_extract_response(self, response):
-        if response["ret_msg"] != "OK":
-            # Error has occured
-
-            # Raise general exception for now
-            # TODO: build exception handling where reponse error can be fixed
-            raise Exception(response["ret_msg"])
-        return response["result"]
-
-    def _order_book_prepare_request(self, symbol, inst_type, depth):
-        request_url = os.path.join(self._base_url, "v2/public/orderBook/L2")
-
-        return Request(
+    reqs = []
+    for starttime, endtime, limit in zip(starttimes, endtimes, limits):
+        req = Request(
             "GET",
-            request_url,
+            url,
             params={
-                "symbol": symbol,
+                "symbol": instrument_id,
+                "interval": interval_id,
+                "startTime": dt_to_timestamp(starttime, granularity="milliseconds"),
+                "endTime": dt_to_timestamp(endtime, granularity="milliseconds"),
+                "limit": limit,
             },
         )
+        reqs.append(req)
 
-    def _order_book_extract_response(self, response):
-        if response["result"] == None:
-            # Error has occured
+    responses = dispatcher.send_requests(reqs)
+    return OHLCVInterface.format_responses(responses, ["result"], ["ret_code"], 0, ["ret_msg"], col_map)
 
-            # Raise general exception for now
-            # TODO: build exception handling where reponse error can be fixed
-            raise Exception("No data for this symbol")
-        df = (
-            pd.DataFrame(response["result"])
-            .drop(columns=["symbol"])
-            .reindex(columns=[OrderBookSchema.price, "size", OrderBookSchema.side])
-            .rename(columns={"size": OrderBookSchema.quantity})
-            .replace(["Sell", "Buy"], [OrderBookSide.ask, OrderBookSide.bid])
-            .assign(
-                **{OrderBookSchema.timestamp: datetime.datetime.utcfromtimestamp(int(float(response["time_now"])))}
-            )
+
+def order_book_perp(dispatcher: Dispatcher, url: str, instrument_name: str, depth: int = 20) -> pd.DataFrame:
+    col_map = {
+        "price": OrderBookSchema.price,
+        "size": OrderBookSchema.quantity,
+        "side": OrderBookSchema.side,
+    }
+    request = Request(
+        "GET",
+        url,
+        params={
+            "symbol": instrument_name,
+        },
+    )
+    response = dispatcher.send_request(request)
+    orderbook = OrderBookInterface.handle_response(response, ["result"], ["ret_code"], 0, ["ret_msg"], col_map, ())
+    orderbook.replace("Sell", OrderBookSide.ask, inplace=True)
+    orderbook.replace("Buy", OrderBookSide.bid, inplace=True)
+    return orderbook
+
+
+def order_book_spot(dispatcher: Dispatcher, url: str, instrument_id: str, depth: int = 20) -> pd.DataFrame:
+    col_map = {
+        0: OrderBookSchema.price,
+        1: OrderBookSchema.quantity,
+    }
+    request = Request(
+        "GET",
+        url,
+        params={
+            "symbol": instrument_id,
+        },
+    )
+    response = dispatcher.send_request(request)
+    orderbook = OrderBookInterface.handle_response(
+        response, ["result"], ["ret_code"], 0, ["ret_msg"], col_map, ("bids", "asks")
+    )
+    return orderbook
+
+
+class Bybit(ExchangeAPIBase):
+
+    name = "bybit"
+    base_url = "https://api.bybit.com"
+
+    intervals_perp = {
+        Interval.interval_1m: (1, datetime.timedelta(minutes=1)),
+        Interval.interval_5m: (5, datetime.timedelta(minutes=5)),
+        Interval.interval_15m: (15, datetime.timedelta(minutes=15)),
+        Interval.interval_1h: (60, datetime.timedelta(hours=1)),
+        Interval.interval_4h: (240, datetime.timedelta(hours=4)),
+        Interval.interval_12h: (720, datetime.timedelta(hours=12)),
+        Interval.interval_1d: ("D", datetime.timedelta(days=1)),
+    }
+
+    intervals_spot = {
+        Interval.interval_1m: ("1m", datetime.timedelta(minutes=1)),
+        Interval.interval_5m: ("5m", datetime.timedelta(minutes=5)),
+        Interval.interval_15m: ("15m", datetime.timedelta(minutes=15)),
+        Interval.interval_1h: ("1h", datetime.timedelta(hours=1)),
+        Interval.interval_4h: ("4h", datetime.timedelta(hours=4)),
+        Interval.interval_12h: ("12h", datetime.timedelta(hours=12)),
+        Interval.interval_1d: ("1d", datetime.timedelta(days=1)),
+    }
+
+    def __init__(self, cache_kwargs={"disabled": False, "refresh": False}, log_level: str = "DEBUG"):
+        super().__init__(cache_kwargs=cache_kwargs, log_level=log_level)
+        self.init_dispatchers()
+        self.init_instrument_info_interface()
+        self.init_ohlcv_interface()
+        self.init_order_book_interface()
+
+    def init_dispatchers(self):
+        # Check which endpoints employ a limit
+        self.logger.debug("initializing dispatchers")
+        self.dispatcher = Dispatcher(f"{self.name}.dispatcher", timeout=1 / 40)
+
+    def init_instrument_info_interface(self):
+        perpetual = InstrumentInfoInterface(
+            exchange=self,
+            interface_name=Interface.INSTRUMENT_INFO,
+            inst_type=InstrumentType.PERPETUAL,
+            url=os.path.join(self.base_url, "v2/public/symbols"),
+            dispatcher=self.dispatcher,
+            execute=instrument_info_perp,
         )
-        return df
 
-    def _order_book_quantity_multiplier(self, symbol, inst_type, **kwargs):
-        return 1
+        spot = InstrumentInfoInterface(
+            exchange=self,
+            interface_name=Interface.INSTRUMENT_INFO,
+            inst_type=InstrumentType.SPOT,
+            url=os.path.join(self.base_url, "spot/v1/symbols"),
+            dispatcher=self.dispatcher,
+            execute=instrument_info_spot,
+        )
 
-    @staticmethod
-    def ET_to_datetime(et):
-        # Convert exchange native time format to datetime
-        return datetime.datetime.utcfromtimestamp(int(et))
+        self.interfaces[Interface.INSTRUMENT_INFO] = {
+            InstrumentType.PERPETUAL: perpetual,
+            InstrumentType.SPOT: spot,
+        }
 
-    @staticmethod
-    def datetime_to_ET(dt):
-        # Convert datetime to exchange native time format
-        return int(dt.replace(tzinfo=datetime.timezone.utc).timestamp())
+    def init_ohlcv_interface(self):
+        perpetual = OHLCVInterface(
+            intervals=self.intervals_perp,
+            start_inclusive=True,
+            end_inclusive=False,
+            max_response_limit=200,
+            exchange=self,
+            interface_name=Interface.OHLCV,
+            inst_type=InstrumentType.PERPETUAL,
+            url=os.path.join(self.base_url, "public/linear/kline"),
+            dispatcher=self.dispatcher,
+            execute=ohlcv_perp,
+        )
 
-    @staticmethod
-    def ET_to_seconds(et):
-        # Convert exchange native time format to seconds
-        return int(et)
+        spot = OHLCVInterface(
+            intervals=self.intervals_spot,
+            start_inclusive=False,
+            end_inclusive=False,
+            max_response_limit=1000,
+            exchange=self,
+            interface_name=Interface.OHLCV,
+            inst_type=InstrumentType.SPOT,
+            url=os.path.join(self.base_url, "spot/quote/v1/kline"),
+            dispatcher=self.dispatcher,
+            execute=ohlcv_spot,
+        )
 
-    @staticmethod
-    def seconds_to_ET(seconds):
-        return int(seconds)
+        self.interfaces[Interface.OHLCV] = {
+            InstrumentType.PERPETUAL: perpetual,
+            InstrumentType.SPOT: spot,
+        }
+
+    def init_order_book_interface(self):
+        perpetual = OrderBookInterface(
+            exchange=self,
+            interface_name=Interface.ORDER_BOOK,
+            inst_type=InstrumentType.PERPETUAL,
+            url=os.path.join(self.base_url, "v2/public/orderBook/L2"),
+            dispatcher=self.dispatcher,
+            execute=order_book_perp,
+        )
+
+        spot = OrderBookInterface(
+            exchange=self,
+            interface_name=Interface.ORDER_BOOK,
+            inst_type=InstrumentType.SPOT,
+            url=os.path.join(self.base_url, "spot/quote/v1/depth"),
+            dispatcher=self.dispatcher,
+            execute=order_book_spot,
+        )
+
+        self.interfaces[Interface.ORDER_BOOK] = {
+            InstrumentType.PERPETUAL: perpetual,
+            InstrumentType.SPOT: spot,
+        }
 
 
 _exchange_export = Bybit

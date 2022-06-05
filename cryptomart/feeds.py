@@ -92,7 +92,7 @@ class FeedBase(pd.DataFrame):
         return super().set_index(OHLCVColumn.open_time)[columns].plot(title=self._underlying_info, **kwargs)
 
     def __str__(self):
-        return super().__str__() + self._underlying_info + "\n"
+        return super().__str__() + "\n" + self._underlying_info + "\n"
 
 
 class OHLCVFeed(FeedBase):

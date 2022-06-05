@@ -2,24 +2,26 @@ import importlib
 import logging
 from datetime import datetime
 
-import numpy as np
 import pytest
-from cryptomart.enums import Exchange, InstrumentType, Interval, OrderBookSchema, OrderBookSide, Symbol
+from cryptomart.enums import Exchange, Instrument, InstrumentType, Interval, OrderBookSchema, OrderBookSide, Symbol
 from cryptomart.errors import NotSupportedError
 from cryptomart.exchanges.base import ExchangeAPIBase
-from cryptomart.util import parse_time
 
-DONT_TEST = {
-    Exchange.BYBIT,
-    Exchange.BITMEX,
-    Exchange.COINFLEX,
-    Exchange.FTX,
-    Exchange.GATEIO,
-    Exchange.KUCOIN,
-    Exchange.OKEX,
-}
+DONT_TEST = set(
+    {
+        # Exchange.BINANCE,
+        # Exchange.COINFLEX,
+        # Exchange.BYBIT,
+        # Exchange.BITMEX,
+        # Exchange.FTX,
+        # Exchange.GATEIO,
+        # Exchange.KUCOIN,
+        # Exchange.OKEX,
+    }
+)
 
-logging.getLogger("cryptomart.binance").setLevel("DEBUG")
+PRINT = True
+LOG_LEVEL = "DEBUG"
 
 
 @pytest.fixture(params=set(Exchange._values()) - DONT_TEST, scope="module")
@@ -27,7 +29,7 @@ def exchange(request) -> ExchangeAPIBase:
     exchange_id = request.param
     exchange_module = importlib.import_module(f"cryptomart.exchanges.{exchange_id}")
     exchange_class = exchange_module._exchange_export
-    exchange_instance = exchange_class(cache_kwargs={"disabled": True})
+    exchange_instance = exchange_class(cache_kwargs={"disabled": True}, log_level=LOG_LEVEL)
     return exchange_instance
 
 
@@ -41,12 +43,15 @@ def test_init(exchange: ExchangeAPIBase):
 def test_instrument_info(exchange: ExchangeAPIBase, inst_type: InstrumentType):
     df = exchange.instrument_info(inst_type)
     assert not df.empty
+    assert set(Instrument._values()).issubset(set(df.columns))
+    if PRINT:
+        print(df)
 
 
-@pytest.mark.parametrize("inst_type", [InstrumentType.PERPETUAL, InstrumentType.SPOT])
+@pytest.mark.parametrize("inst_type", [InstrumentType.SPOT, InstrumentType.PERPETUAL])
 @pytest.mark.parametrize("symbol", [Symbol.BTC, Symbol.ADA, Symbol.DOGE])
 @pytest.mark.parametrize("interval", [Interval.interval_1d, Interval.interval_1h])
-@pytest.mark.parametrize(["starttime", "endtime"], [(datetime(2021, 10, 1), datetime(2021, 12, 3))])
+@pytest.mark.parametrize(["starttime", "endtime"], [(datetime(2022, 5, 25), datetime(2022, 6, 1))])
 @pytest.mark.requires_http
 def test_ohlcv(
     exchange: ExchangeAPIBase,
@@ -61,6 +66,9 @@ def test_ohlcv(
         timedelta = exchange._get_interface("ohlcv", inst_type).intervals[interval][1]
         assert df.open_time.iloc[0] == starttime
         assert df.open_time.iloc[-1] == endtime - timedelta
+        assert (len(df.dropna()) / len(df)) > 0.4, "Missing data"
+        if PRINT:
+            print(df.gaps)
     except NotSupportedError as e:
         pytest.skip(str(e))
 
@@ -81,3 +89,6 @@ def test_orderbook(exchange: ExchangeAPIBase, symbol: Symbol, inst_type: Instrum
 
     assert (bids == correct_bids).all(axis=None)
     assert (asks == correct_asks).all(axis=None)
+
+    if PRINT:
+        print(orderbook)
