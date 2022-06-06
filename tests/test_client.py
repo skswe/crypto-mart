@@ -9,9 +9,9 @@ from cryptomart.exchanges.base import ExchangeAPIBase, NotSupportedError
 PRINT = True
 LOG_LEVEL = "DEBUG"
 CACHE_KWARGS = {"disabled": True}
-# WHITELIST = set(Exchange._values())
+WHITELIST = set(Exchange._values())
 # BLACKLIST = set(Exchange._values())
-WHITELIST = set({Exchange.KUCOIN})
+# WHITELIST = set({Exchange.KUCOIN})
 BLACKLIST = set({})
 EXCHANGES = WHITELIST - BLACKLIST
 

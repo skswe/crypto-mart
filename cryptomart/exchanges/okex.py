@@ -125,7 +125,7 @@ class OKEx(ExchangeAPIBase):
         Interval.interval_1d: ("1Dutc", datetime.timedelta(days=1)),
     }
 
-    def __init__(self, cache_kwargs={"disabled": False, "refresh": False}, log_level: str = "DEBUG"):
+    def __init__(self, cache_kwargs={"disabled": False, "refresh": False}, log_level: str = "INFO"):
         super().__init__(cache_kwargs=cache_kwargs, log_level=log_level)
         self.init_dispatchers()
         self.init_instrument_info_interface()
