@@ -1,11 +1,16 @@
+import base64
 import datetime
+import hashlib
+import hmac
 import os
+import time
 from typing import List
 
 import pandas as pd
 from cryptomart.interfaces.instrument_info import InstrumentInfoInterface
 from cryptomart.interfaces.order_book import OrderBookInterface
-from requests import Request
+from dotenv import load_dotenv
+from requests import PreparedRequest, Request
 
 from ..enums import Instrument, InstrumentType, Interface, Interval, OrderBookSchema
 from ..feeds import OHLCVColumn
@@ -13,6 +18,8 @@ from ..interfaces.ohlcv import OHLCVInterface
 from ..types import IntervalType
 from ..util import Dispatcher, dt_to_timestamp
 from .base import ExchangeAPIBase
+
+load_dotenv()
 
 
 def instrument_info_perp(dispatcher: Dispatcher, url: str) -> pd.DataFrame:
@@ -132,6 +139,28 @@ def order_book(dispatcher: Dispatcher, url: str, instrument_name: str, depth: in
     return orderbook
 
 
+def authenticate_request_spot(request: PreparedRequest) -> PreparedRequest:
+    API_KEY = os.environ["KUCOIN_SPOT_API_KEY"]
+    API_SECRET = os.environ["KUCOIN_SPOT_API_SECRET"]
+    API_PASSPHRASE = os.environ["KUCOIN_SPOT_API_PASSPHRASE"]
+    now = int(time.time() * 1000)
+    str_to_sign = str(now) + request.method + request.path_url + (request.body or "")
+    signature = base64.b64encode(
+        hmac.new(API_SECRET.encode("utf-8"), str_to_sign.encode("utf-8"), hashlib.sha256).digest()
+    )
+    passphrase = base64.b64encode(
+        hmac.new(API_SECRET.encode("utf-8"), API_PASSPHRASE.encode("utf-8"), hashlib.sha256).digest()
+    )
+    request.headers = {
+        "KC-API-SIGN": signature,
+        "KC-API-TIMESTAMP": str(now),
+        "KC-API-KEY": API_KEY,
+        "KC-API-PASSPHRASE": passphrase,
+        "KC-API-KEY-VERSION": "2",
+    }
+    return request
+
+
 class Kucoin(ExchangeAPIBase):
 
     name = "kucoin"
@@ -169,7 +198,10 @@ class Kucoin(ExchangeAPIBase):
 
     def init_dispatchers(self):
         self.logger.debug("initializing dispatchers")
-        self.dispatcher = Dispatcher(f"{self.name}.dispatcher.perpetual", timeout=1 / 4)
+        self.perpetual_dispatcher = Dispatcher(f"{self.name}.dispatcher.perpetual", timeout=1 / 2)
+        self.spot_dispatcher = Dispatcher(
+            f"{self.name}.dispatcher.spot", timeout=1 / 2, pre_request_hook=authenticate_request_spot
+        )
 
     def init_instrument_info_interface(self):
         perpetual = InstrumentInfoInterface(
@@ -177,7 +209,7 @@ class Kucoin(ExchangeAPIBase):
             interface_name=Interface.INSTRUMENT_INFO,
             inst_type=InstrumentType.PERPETUAL,
             url=os.path.join(self.futures_base_url, "api/v1/contracts/active"),
-            dispatcher=self.dispatcher,
+            dispatcher=self.perpetual_dispatcher,
             execute=instrument_info_perp,
         )
 
@@ -186,7 +218,7 @@ class Kucoin(ExchangeAPIBase):
             interface_name=Interface.INSTRUMENT_INFO,
             inst_type=InstrumentType.SPOT,
             url=os.path.join(self.spot_base_url, "api/v1/symbols"),
-            dispatcher=self.dispatcher,
+            dispatcher=self.spot_dispatcher,
             execute=instrument_info_spot,
         )
 
@@ -205,7 +237,7 @@ class Kucoin(ExchangeAPIBase):
             interface_name=Interface.OHLCV,
             inst_type=InstrumentType.PERPETUAL,
             url=os.path.join(self.futures_base_url, "api/v1/kline/query"),
-            dispatcher=self.dispatcher,
+            dispatcher=self.perpetual_dispatcher,
             execute=ohlcv_perp,
         )
 
@@ -218,7 +250,7 @@ class Kucoin(ExchangeAPIBase):
             interface_name=Interface.OHLCV,
             inst_type=InstrumentType.SPOT,
             url=os.path.join(self.spot_base_url, "api/v1/market/candles"),
-            dispatcher=self.dispatcher,
+            dispatcher=self.spot_dispatcher,
             execute=ohlcv_spot,
         )
 
@@ -233,7 +265,7 @@ class Kucoin(ExchangeAPIBase):
             interface_name=Interface.ORDER_BOOK,
             inst_type=InstrumentType.PERPETUAL,
             url=os.path.join(self.futures_base_url, "api/v1/level2/depth100"),
-            dispatcher=self.dispatcher,
+            dispatcher=self.perpetual_dispatcher,
             execute=order_book,
         )
 
@@ -242,7 +274,7 @@ class Kucoin(ExchangeAPIBase):
             interface_name=Interface.ORDER_BOOK,
             inst_type=InstrumentType.SPOT,
             url=os.path.join(self.spot_base_url, "api/v3/market/orderbook/level2"),
-            dispatcher=self.dispatcher,
+            dispatcher=self.spot_dispatcher,
             execute=order_book,
         )
 

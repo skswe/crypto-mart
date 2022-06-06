@@ -18,6 +18,7 @@ def int_to_dt(time: int):
         except (ValueError, AttributeError):
             continue
 
+
 def parse_time(time: TimeType) -> datetime.datetime:
     if isinstance(time, pd.Timestamp):
         return time.to_pydatetime().replace(tzinfo=None)
@@ -30,11 +31,11 @@ def parse_time(time: TimeType) -> datetime.datetime:
     elif isinstance(time, str):
         try:
             # time is an string literal integer
-            time = int(time) # raises ValueError if it cant convert to int
+            time = int(time)  # raises ValueError if it cant convert to int
             return int_to_dt(time)
         except ValueError:
             # time is a string time format
-            return pd.to_datetime(time).to_pydatetime().replace(tzinfo=None)        
+            return pd.to_datetime(time).to_pydatetime().replace(tzinfo=None)
 
 
 def dt_to_timestamp(dt: datetime.datetime, string=False, granularity="seconds"):
@@ -75,8 +76,9 @@ class Clock:
 
 
 class Dispatcher:
-    def __init__(self, name: str, dispatch_fn: Callable = None, timeout: float = 0):
+    def __init__(self, name: str, dispatch_fn: Callable = None, timeout: float = 0, pre_request_hook=None):
         self.dispatch_fn = dispatch_fn or self._default_dispatch_fn
+        self.pre_request_hook = pre_request_hook or (lambda r: r)
         self.pending_queue = Queue()
         self.result_queue = Queue()
 
@@ -92,10 +94,10 @@ class Dispatcher:
         self.logger.debug(f"Dispatcher: Making request -- {request.method}: {request.url}, params={request.params}")
         try:
             with requests.Session() as s:
-                res = s.send(request.prepare()).json()
+                res = s.send(self.pre_request_hook(request.prepare())).json()
             assert isinstance(res, dict) or isinstance(res, list), f"Unexpected response: {res}"
         except Exception as e:
-            self.logger.error(f"Dispatcher: Error in request -- {request.method}: {request.url}: {e}")
+            self.logger.error(f"Dispatcher: Error in request -- {request.method}: {request.url}: {e}", exc_info=True)
             res = None
         self.logger.debug("Dispatcher: Got response")
         return res

@@ -9,9 +9,9 @@ from cryptomart.exchanges.base import ExchangeAPIBase, NotSupportedError
 PRINT = True
 LOG_LEVEL = "DEBUG"
 CACHE_KWARGS = {"disabled": True}
-WHITELIST = set(Exchange._values())
+# WHITELIST = set(Exchange._values())
 # BLACKLIST = set(Exchange._values())
-# WHITELIST = set({Exchange.KUCOIN})
+WHITELIST = set({Exchange.KUCOIN})
 BLACKLIST = set({})
 EXCHANGES = WHITELIST - BLACKLIST
 
@@ -39,7 +39,7 @@ def test_instrument_info(exchange: ExchangeAPIBase, inst_type: InstrumentType):
 @pytest.mark.parametrize("inst_type", [InstrumentType.SPOT, InstrumentType.PERPETUAL])
 @pytest.mark.parametrize("symbol", [Symbol.BTC, Symbol.ADA, Symbol.DOGE])
 @pytest.mark.parametrize("interval", [Interval.interval_1d, Interval.interval_1h])
-@pytest.mark.parametrize(["starttime", "endtime"], [(datetime(2022, 5, 25), datetime(2022, 6, 1))])
+@pytest.mark.parametrize(["starttime", "endtime"], [(datetime(2022, 5, 25), datetime(2022, 6, 3))])
 @pytest.mark.requires_http
 def test_ohlcv(
     exchange: ExchangeAPIBase,

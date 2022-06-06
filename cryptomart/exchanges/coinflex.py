@@ -82,6 +82,12 @@ def ohlcv(
     return OHLCVInterface.format_responses(responses, ["data"], ["success"], True, ["message"], col_map)
 
 
+def ohlcv_limit(timedelta: datetime.timedelta) -> int:
+    TIME_LIMIT = datetime.timedelta(days=7)
+    RECORD_LIMIT = 5000
+    return min(RECORD_LIMIT, int(TIME_LIMIT / timedelta))
+
+
 def order_book(dispatcher: Dispatcher, url: str, instrument_id: str, depth: int = 20) -> pd.DataFrame:
     col_map = {
         0: OrderBookSchema.price,
@@ -157,7 +163,7 @@ class CoinFLEX(ExchangeAPIBase):
             intervals=self.intervals,
             start_inclusive=True,
             end_inclusive=True,
-            max_response_limit=5000,
+            max_response_limit=ohlcv_limit,
             exchange=self,
             interface_name=Interface.OHLCV,
             inst_type=InstrumentType.PERPETUAL,
@@ -170,7 +176,7 @@ class CoinFLEX(ExchangeAPIBase):
             intervals=self.intervals,
             start_inclusive=True,
             end_inclusive=True,
-            max_response_limit=5000,
+            max_response_limit=ohlcv_limit,
             exchange=self,
             interface_name=Interface.OHLCV,
             inst_type=InstrumentType.SPOT,

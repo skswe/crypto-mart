@@ -1,7 +1,7 @@
 import datetime
 import math
 import os
-from typing import Dict, List, Tuple
+from typing import Callable, Dict, List, Tuple, Union
 
 import numpy as np
 import pandas as pd
@@ -22,7 +22,7 @@ class OHLCVInterface(APIInterface):
         intervals: Dict[Interval, IntervalType],
         start_inclusive: bool,
         end_inclusive: bool,
-        max_response_limit: int,
+        max_response_limit: Union[int, Callable[[datetime.timedelta], int]],
         valid_data_threshold: float = 1,
         **api_interface_kwargs,
     ):
@@ -89,7 +89,9 @@ class OHLCVInterface(APIInterface):
 
         instrument_id = self.instruments[symbol]
         interval_id, timedelta = self.intervals[interval]
-        limit = self.max_response_limit
+        limit = (
+            self.max_response_limit if not callable(self.max_response_limit) else self.max_response_limit(timedelta)
+        )
 
         start_times, end_times, limits = self.get_request_intervals(starttime, endtime, timedelta, limit)
 
