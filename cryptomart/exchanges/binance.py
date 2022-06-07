@@ -3,13 +3,14 @@ import os
 from typing import List
 
 import pandas as pd
-from cryptomart.interfaces.instrument_info import InstrumentInfoInterface
-from cryptomart.interfaces.order_book import OrderBookInterface
 from requests import Request
 
-from ..enums import Instrument, InstrumentType, Interface, Interval, OrderBookSchema
+from ..enums import FundingRateSchema, Instrument, InstrumentType, Interface, Interval, OrderBookSchema
 from ..feeds import OHLCVColumn
+from ..interfaces.funding_rate import FundingRateInterface
+from ..interfaces.instrument_info import InstrumentInfoInterface
 from ..interfaces.ohlcv import OHLCVInterface
+from ..interfaces.order_book import OrderBookInterface
 from ..types import IntervalType
 from ..util import Dispatcher, dt_to_timestamp
 from .base import ExchangeAPIBase
@@ -79,6 +80,36 @@ def ohlcv(
 
     responses = dispatcher.send_requests(reqs)
     return OHLCVInterface.format_responses(responses, [], [], None, [], col_map)
+
+
+def funding_rate(
+    dispatcher: Dispatcher,
+    url: str,
+    instrument_id: str,
+    starttimes: List[datetime.datetime],
+    endtimes: List[datetime.datetime],
+    limits: List[int],
+):
+    col_map = {
+        "fundingTime": FundingRateSchema.timestamp,
+        "fundingRate": FundingRateSchema.funding_rate,
+    }
+    reqs = []
+    for starttime, endtime, limit in zip(starttimes, endtimes, limits):
+        req = Request(
+            "GET",
+            url,
+            params={
+                "symbol": instrument_id,
+                "limit": limit,
+                "startTime": dt_to_timestamp(starttime, granularity="milliseconds"),
+                "endTime": dt_to_timestamp(endtime, granularity="milliseconds"),
+            },
+        )
+        reqs.append(req)
+
+    responses = dispatcher.send_requests(reqs)
+    return FundingRateInterface.format_responses(responses, [], [], None, [], col_map)
 
 
 def order_book(dispatcher: Dispatcher, url: str, instrument_name: str, depth: int = 20) -> pd.DataFrame:

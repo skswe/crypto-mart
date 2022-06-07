@@ -3,13 +3,14 @@ import os
 from typing import List
 
 import pandas as pd
-from cryptomart.interfaces.instrument_info import InstrumentInfoInterface
-from cryptomart.interfaces.order_book import OrderBookInterface
 from requests import Request
 
 from ..enums import Instrument, InstrumentType, Interface, Interval, OrderBookSchema, OrderBookSide
 from ..feeds import OHLCVColumn
+from ..interfaces.funding_rate import FundingRateInterface
+from ..interfaces.instrument_info import InstrumentInfoInterface
 from ..interfaces.ohlcv import OHLCVInterface
+from ..interfaces.order_book import OrderBookInterface
 from ..types import IntervalType
 from ..util import Dispatcher, dt_to_timestamp
 from .base import ExchangeAPIBase
@@ -112,6 +113,28 @@ def ohlcv_spot(
 
     responses = dispatcher.send_requests(reqs)
     return OHLCVInterface.format_responses(responses, [], [], None, ["message"], col_map)
+
+
+def funding_rate(
+    dispatcher: Dispatcher,
+    url: str,
+    instrument_id: str,
+    starttimes: List[datetime.datetime],
+    endtimes: List[datetime.datetime],
+    limits: List[int],
+):
+    col_map = {}
+    reqs = []
+    for starttime, endtime, limit in zip(starttimes, endtimes, limits):
+        req = Request(
+            "GET",
+            url,
+            params={},
+        )
+        reqs.append(req)
+
+    responses = dispatcher.send_requests(reqs)
+    return FundingRateInterface.format_responses(responses, [], [], None, [], col_map)
 
 
 def order_book_perp(dispatcher: Dispatcher, url: str, instrument_name: str, depth: int = 20) -> pd.DataFrame:

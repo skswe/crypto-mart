@@ -1,6 +1,13 @@
 from pyutil.enums import NameEnum
 
 
+class Instrument(NameEnum):
+    cryptomart_symbol = "cryptomart_symbol"
+    exchange_symbol = "exchange_symbol"
+    orderbook_multi = "orderbook_multi"
+    exchange_list_time = "exchange_list_time"
+
+
 class OHLCVColumn(NameEnum):
     "Column names for OHLCV data feed"
 
@@ -13,11 +20,16 @@ class OHLCVColumn(NameEnum):
     returns = "returns"
 
 
-class Instrument(NameEnum):
-    cryptomart_symbol = "cryptomart_symbol"
-    exchange_symbol = "exchange_symbol"
-    orderbook_multi = "orderbook_multi"
-    exchange_list_time = "exchange_list_time"
+class FundingRateSchema(NameEnum):
+    "Column Schema for Funding rate structure"
+    symbol = "symbol"
+
+    timestamp = "timestamp"
+    """Timestamp of Funding Rate"""
+
+    funding_rate = "funding_rate"
+    """Value of Funding Rate """
+
 
 class OrderBookSchema(NameEnum):
     "Column Schema for Order Book data structure"

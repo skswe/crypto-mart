@@ -7,15 +7,15 @@ import numpy as np
 import pandas as pd
 from pyutil.cache import cached
 
-from ..enums import Instrument, Interval, OHLCVColumn, Symbol
+from ..enums import FundingRateSchema, Instrument, Symbol
 from ..errors import MissingDataError, NotSupportedError
-from ..interfaces.api import APIInterface
 from ..types import TimeType
 from ..util import parse_time
+from .api import APIInterface
 
 
 class FundingRateInterface(APIInterface):
-    """API interface to query funding rate data. Columns to be returned are defined in the `OHLCVColumn` enum."""
+    """API interface to query funding rate data. Columns to be returned are defined in the `Funding` enum."""
 
     def __init__(
         self,
@@ -23,6 +23,7 @@ class FundingRateInterface(APIInterface):
         end_inclusive: bool,
         max_response_limit: int,
         valid_data_threshold: float = 1,
+        funding_interval: datetime.timedelta = datetime.timedelta(hours=8),
         **api_interface_kwargs,
     ):
         """Initialize the interface
@@ -40,6 +41,7 @@ class FundingRateInterface(APIInterface):
         self.end_inclusive = end_inclusive
         self.max_response_limit = max_response_limit
         self.valid_data_threshold = valid_data_threshold
+        self.funding_interval = funding_interval
 
     @cached(
         os.path.join(os.getenv("CM_CACHE_PATH", "/tmp/cache"), "funding_rate"),
@@ -80,25 +82,25 @@ class FundingRateInterface(APIInterface):
         instrument_id = self.instruments[symbol]
         limit = self.max_response_limit
 
-        start_times, end_times, limits = self.get_request_intervals(starttime, endtime, timedelta, limit)
+        start_times, end_times, limits = self.get_request_intervals(starttime, endtime, self.funding_interval, limit)
 
-        data = self.execute(self.dispatcher, self.url, instrument_id, interval_id, start_times, end_times, limits)
+        data = self.execute(self.dispatcher, self.url, instrument_id, start_times, end_times, limits)
 
-        data[OHLCVColumn.open_time] = data[OHLCVColumn.open_time].apply(lambda e: parse_time(e))
+        data[FundingRateSchema.timestamp] = data[FundingRateSchema.timestamp].apply(lambda e: parse_time(e))
 
         # Fill missing rows / remove extra rows
         # remove the last index since we only care about open_time
-        expected_index = pd.date_range(starttime, endtime, freq=timedelta)[:-1]
+        expected_index = pd.date_range(starttime, endtime, freq=self.funding_interval)[:-1]
 
         # Drop duplicate open_time axis
-        data = data.groupby(OHLCVColumn.open_time).first()
+        data = data.groupby(FundingRateSchema.timestamp).first()
 
         # Forces index to [starttime, endtime], adding nulls where necessary
-        data = data.reindex(expected_index).reset_index().rename(columns={"index": OHLCVColumn.open_time})
+        data = data.reindex(expected_index).reset_index().rename(columns={"index": FundingRateSchema.timestamp})
 
         # Convert columns to float
-        data[np.setdiff1d(data.columns, OHLCVColumn.open_time)] = data[
-            np.setdiff1d(data.columns, OHLCVColumn.open_time)
+        data[np.setdiff1d(data.columns, FundingRateSchema.timestamp)] = data[
+            np.setdiff1d(data.columns, FundingRateSchema.timestamp)
         ].astype(float)
 
         expected_n_rows = sum(limits)
@@ -201,7 +203,7 @@ class FundingRateInterface(APIInterface):
                 out = pd.concat([out, df], ignore_index=True)
             except MissingDataError:
                 continue
-        return out.sort_values(OHLCVColumn.open_time, ascending=True)
+        return out.sort_values(FundingRateSchema.timestamp, ascending=True)
 
     @staticmethod
     def parse_response(res: dict, col_map: dict) -> pd.DataFrame:
