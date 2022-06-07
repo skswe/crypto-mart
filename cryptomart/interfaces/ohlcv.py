@@ -33,10 +33,6 @@ class OHLCVInterface(APIInterface):
             start_inclusive (bool): `True` if the first open_time returned will match starttime parameter
             end_inclusive (bool): `True` if the last open_time returned will match endtime parameter
             max_response_limit (int): Max number of rows that can be returned in one request to the API
-            prepare_request (Callable[[str, str, IntervalType, datetime.datetime, datetime.datetime, int], Request]): Function which takes
-                (url, instrument_id, interval_id, starttime, endtime, limit) and returns a `Request` to be sent to the API
-            extract_data (Callable[[List[JSONDataType]], pd.DataFrame]): Function which takes a list of all API responses and
-                and returns a DataFrame in standard format. I.e. all columns in `OHLCVColumn` are present with the correct dtype.
             valid_data_threshold (float, optional): Percentage of data that must be present in the response. Depending on the
                 value of `strict` in the function call, either a warning will be logged or an exception will be raised. Defaults to 1.
         """
