@@ -15,7 +15,7 @@ from .api import APIInterface
 
 
 class FundingRateInterface(APIInterface):
-    """API interface to query funding rate data. Columns to be returned are defined in the `Funding` enum."""
+    """API interface to query funding rate data. Columns to be returned are defined in the `FundingRateSchema` enum."""
 
     def __init__(
         self,
@@ -85,9 +85,15 @@ class FundingRateInterface(APIInterface):
         start_times, end_times, limits = self.get_request_intervals(starttime, endtime, self.funding_interval, limit)
 
         data = self.execute(self.dispatcher, self.url, instrument_id, start_times, end_times, limits)
+        print("after execute", data)
 
         data[FundingRateSchema.timestamp] = data[FundingRateSchema.timestamp].apply(lambda e: parse_time(e))
-
+        data = (
+            data.resample(self.funding_interval, on=FundingRateSchema.timestamp)
+            .median()
+            .drop(columns=FundingRateSchema.timestamp)
+        )
+        print("after resample", data)
         # Fill missing rows / remove extra rows
         # remove the last index since we only care about open_time
         expected_index = pd.date_range(starttime, endtime, freq=self.funding_interval)[:-1]
@@ -195,7 +201,7 @@ class FundingRateInterface(APIInterface):
     def format_responses(
         cls, responses, data_attrs, code_attrs, expected_code, err_msg_attrs, col_map
     ) -> pd.DataFrame:
-        """Automatically handle list of ohlcv python parsed JSON responses"""
+        """Automatically handle list of timeseries python parsed JSON responses"""
         out = pd.DataFrame(columns=col_map.values())
         for res in responses:
             try:
@@ -212,4 +218,5 @@ class FundingRateInterface(APIInterface):
         if df.empty:
             raise MissingDataError
         df.rename(columns=col_map, inplace=True)
+        print("raw from api", df)
         return df[col_map.values()]

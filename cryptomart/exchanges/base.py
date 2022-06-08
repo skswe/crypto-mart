@@ -100,18 +100,38 @@ class ExchangeAPIBase(ABC):
         Returns:
             OHLCVFeed: OHLCV dataframe with custom methods and properties
         """
-        if starttime is None:
-            # Get default starttime
-            pass
-        if endtime is None:
-            # Get default endtime
-            pass
-
         args = (symbol, interval, starttime, endtime, strict)
-        df = self._run_interface(
+        return self._run_interface(
             Interface.OHLCV, inst_type, *args, cache_kwargs=dict(self.cache_kwargs, **cache_kwargs)
         )
-        return OHLCVFeed(df, self.name, symbol, inst_type, interval, starttime, endtime)
+
+    def funding_rate(
+        self,
+        symbol: Symbol,
+        inst_type: InstrumentType,
+        starttime: TimeType = None,
+        endtime: TimeType = None,
+        strict: bool = False,
+        cache_kwargs: dict = {},
+    ) -> pd.DataFrame:
+        """Run main interface function
+
+        Args:
+            symbol (Symbol): Symbol to query
+            starttime (TimeType): Time of the first open
+            endtime (TimeType): Time of the last close
+            strict (bool): If `True`, raises an exception when missing data is above threshold
+        Raises:
+            NotSupportedError: If the given symbol is not supported by the API
+            MissingDataError: If data does not meet self.valid_data_threshold and `strict=True`.
+
+        Returns:
+            pd.DataFrame: funding rate dataframe
+        """
+        args = (symbol, starttime, endtime, strict)
+        return self._run_interface(
+            Interface.FUNDING_RATE, inst_type, *args, cache_kwargs=dict(self.cache_kwargs, **cache_kwargs)
+        )
 
     def order_book(self, symbol: Symbol, inst_type: InstrumentType, depth: int = 20, cache_kwargs: dict = {}):
         """Get orderbook snapshot

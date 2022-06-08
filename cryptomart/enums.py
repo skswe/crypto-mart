@@ -22,7 +22,6 @@ class OHLCVColumn(NameEnum):
 
 class FundingRateSchema(NameEnum):
     "Column Schema for Funding rate structure"
-    symbol = "symbol"
 
     timestamp = "timestamp"
     """Timestamp of Funding Rate"""
@@ -70,6 +69,7 @@ class Exchange(NameEnum):
 class Interface(NameEnum):
     INSTRUMENT_INFO = "instrument_info"
     OHLCV = "ohlcv"
+    FUNDING_RATE = "funding_rate"
     ORDER_BOOK = "order_book"
 
 

@@ -5,6 +5,7 @@ from typing import Callable, Dict, List, Tuple, Union
 
 import numpy as np
 import pandas as pd
+from cryptomart.feeds import OHLCVFeed
 from pyutil.cache import cached
 
 from ..enums import Instrument, Interval, OHLCVColumn, Symbol
@@ -119,7 +120,7 @@ class OHLCVInterface(APIInterface):
                 else:
                     self.logger.warning(msg)
 
-        return data
+        return OHLCVFeed(data, self.exchange.name, symbol, self.inst_type, interval, starttime, endtime)
 
     def get_request_intervals(
         self,
@@ -202,7 +203,7 @@ class OHLCVInterface(APIInterface):
     def format_responses(
         cls, responses, data_attrs, code_attrs, expected_code, err_msg_attrs, col_map
     ) -> pd.DataFrame:
-        """Automatically handle list of ohlcv python parsed JSON responses"""
+        """Automatically handle list of timeseries python parsed JSON responses"""
         out = pd.DataFrame(columns=col_map.values())
         for res in responses:
             try:

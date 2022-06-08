@@ -154,6 +154,7 @@ class Binance(ExchangeAPIBase):
         self.init_dispatchers()
         self.init_instrument_info_interface()
         self.init_ohlcv_interface()
+        self.init_funding_rate_interface()
         self.init_order_book_interface()
 
     def init_dispatchers(self):
@@ -216,6 +217,21 @@ class Binance(ExchangeAPIBase):
             InstrumentType.PERPETUAL: perpetual,
             InstrumentType.SPOT: spot,
         }
+
+    def init_funding_rate_interface(self):
+        perpetual = FundingRateInterface(
+            start_inclusive=True,
+            end_inclusive=True,
+            max_response_limit=1000,
+            exchange=self,
+            interface_name=Interface.FUNDING_RATE,
+            inst_type=InstrumentType.PERPETUAL,
+            url=os.path.join(self.futures_base_url, "fapi/v1/fundingRate"),
+            dispatcher=self.perpetual_dispatcher,
+            execute=funding_rate,
+        )
+
+        self.interfaces[Interface.FUNDING_RATE] = {InstrumentType.PERPETUAL: perpetual}
 
     def init_order_book_interface(self):
         perpetual = OrderBookInterface(
