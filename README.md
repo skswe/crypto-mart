@@ -29,12 +29,12 @@ import cryptomart as cm
 client = cm.Client()
 
 symbol = "BTC"
-instType = "perpetual"
+inst_type = "perpetual"
 interval = cm.Interval.interval_1d
 starttime = "2021-07-15"
 endtime = "2022-4-30"
 
-client.binance.ohlcv(symbol, instType, interval, starttime, endtime)
+client.binance.ohlcv(symbol, inst_type, interval, starttime, endtime)
 ```
 
 Out: 
@@ -65,10 +65,10 @@ import cryptomart as cm
 client = cm.Client()
 
 symbol = "BTC"
-instType = "perpetual"
+inst_type = "perpetual"
 depth = 20
 
-client.binance.order_book(symbol, instType, depth)
+client.binance.order_book(symbol, inst_type, depth)
 ```
 
 Out: 

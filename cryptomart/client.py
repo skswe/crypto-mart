@@ -6,8 +6,6 @@ import os
 from concurrent.futures import ThreadPoolExecutor
 from typing import List
 
-import pyutil
-
 from .enums import Exchange
 from .exchanges import FTX, Binance, BitMEX, Bybit, CoinFLEX, GateIO, Kucoin, OKEx
 from .exchanges.base import ExchangeAPIBase
@@ -22,7 +20,7 @@ class Client:
     def __init__(
         self,
         exchanges: List[Exchange] = Exchange._names(),
-        debug=False,
+        log_level="INFO",
         log_file=None,
         exchange_init_kwargs={},
         **kwargs,
@@ -35,9 +33,7 @@ class Client:
             log_file (str, optional): file to save logs to. Defaults to None.
             exchange_init_kwargs: kwargs to pass to creation of each exchange object in `exchanges`
         """
-        if debug:
-            self.log_level = logging.DEBUG
-            pyutil.root_logger.setLevel(logging.DEBUG)
+        self.log_level = log_level
 
         if log_file is not None:
             if os.path.exists(log_file):
@@ -54,7 +50,7 @@ class Client:
         self._active_exchanges = [getattr(Exchange, e) for e in exchanges]
         self._exchange_instance_map = {}
         self._exchange_class_map = {}
-        self._load_exchanges(debug=debug, **exchange_init_kwargs)
+        self._load_exchanges(**exchange_init_kwargs)
 
     @property
     def binance(self) -> Binance:

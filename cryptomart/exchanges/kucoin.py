@@ -1,43 +1,66 @@
+import base64
 import datetime
-import logging
+import hashlib
+import hmac
 import os
+import time
+from typing import List
 
 import pandas as pd
-from pyutil.cache import cached
-from requests import Request, get
+from dotenv import load_dotenv
+from requests import PreparedRequest, Request
 
-from ..enums import Interval, OrderBookSchema, OrderBookSide
+from ..enums import FundingRateSchema, Instrument, InstrumentType, Interface, Interval, OrderBookSchema
+from ..errors import MissingDataError
 from ..feeds import OHLCVColumn
+from ..interfaces.funding_rate import FundingRateInterface
+from ..interfaces.instrument_info import InstrumentInfoInterface
+from ..interfaces.ohlcv import OHLCVInterface
+from ..interfaces.order_book import OrderBookInterface
+from ..types import IntervalType
+from ..util import Dispatcher, dt_to_timestamp
 from .base import ExchangeAPIBase
-from .instrument_names.kucoin import instrument_names as kucoin_instrument_names
 
-logger = logging.getLogger(__name__)
+load_dotenv()
 
 
-class Kucoin(ExchangeAPIBase):
-    name = "kucoin"
-
-    instrument_names = {**kucoin_instrument_names}
-
-    intervals = {
-        Interval.interval_1m: (1, datetime.timedelta(minutes=1)),
-        Interval.interval_5m: (5, datetime.timedelta(minutes=5)),
-        Interval.interval_15m: (15, datetime.timedelta(minutes=15)),
-        Interval.interval_30m: (30, datetime.timedelta(minutes=30)),
-        Interval.interval_1h: (60, datetime.timedelta(hours=1)),
-        Interval.interval_2h: (120, datetime.timedelta(hours=2)),
-        Interval.interval_4h: (240, datetime.timedelta(hours=4)),
-        Interval.interval_8h: (480, datetime.timedelta(hours=8)),
-        Interval.interval_12h: (720, datetime.timedelta(hours=12)),
-        Interval.interval_1d: (1440, datetime.timedelta(days=1)),
+def instrument_info_perp(dispatcher: Dispatcher, url: str) -> pd.DataFrame:
+    col_map = {
+        "baseCurrency": Instrument.cryptomart_symbol,
+        "symbol": Instrument.exchange_symbol,
+        "firstOpenDate": Instrument.exchange_list_time,
+        "multiplier": Instrument.orderbook_multi,
     }
+    request = Request("GET", url)
+    response = dispatcher.send_request(request)
+    data = InstrumentInfoInterface.extract_response_data(response, ["data"], ["code"], "200000", ["msg"], col_map)
+    data = data[data.status == "Open"]
+    data = data[data.isInverse == False]
+    return data
 
-    _base_url = "https://api-futures.kucoin.com/api/v1"
-    _max_requests_per_second = 10
-    _limit = 200
-    _start_inclusive = True
-    _end_inclusive = True
-    _ohlcv_column_map = {
+
+def instrument_info_spot(dispatcher: Dispatcher, url: str) -> pd.DataFrame:
+    col_map = {
+        "baseCurrency": Instrument.cryptomart_symbol,
+        "symbol": Instrument.exchange_symbol,
+    }
+    request = Request("GET", url)
+    response = dispatcher.send_request(request)
+    data = InstrumentInfoInterface.extract_response_data(response, ["data"], ["code"], "200000", ["msg"], col_map)
+    data = data[data.enableTrading == True]
+    return data
+
+
+def ohlcv_perp(
+    dispatcher: Dispatcher,
+    url: str,
+    instrument_id: str,
+    interval_id: IntervalType,
+    starttimes: List[datetime.datetime],
+    endtimes: List[datetime.datetime],
+    limits: List[int],
+) -> pd.DataFrame:
+    col_map = {
         0: OHLCVColumn.open_time,
         1: OHLCVColumn.open,
         2: OHLCVColumn.high,
@@ -45,62 +68,318 @@ class Kucoin(ExchangeAPIBase):
         4: OHLCVColumn.close,
         5: OHLCVColumn.volume,
     }
-
-    def _ohlcv_prepare_request(self, symbol, instType, interval, starttime, endtime, limit):
-        url = "kline/query"
-        params = {
-            "symbol": symbol,
-            "granularity": interval,
-            "from": starttime,
-            "to": endtime,
-        }
-        request_url = os.path.join(self._base_url, url)
-        return Request("GET", request_url, params=params)
-
-    def _ohlcv_extract_response(self, response):
-        if response["code"] != "200000":
-            # Error has occured
-
-            # Raise general exception for now
-            # TODO: build exception handling where reponse error can be fixed
-            raise Exception(response["msg"])
-        return response["data"]
-
-    def _order_book_prepare_request(self, symbol, instType, depth):
-        request_url = os.path.join(self._base_url, "level2/depth100")
-
-        return Request(
+    reqs = []
+    for starttime, endtime, limit in zip(starttimes, endtimes, limits):
+        req = Request(
             "GET",
-            request_url,
+            url,
             params={
-                "symbol": symbol,
+                "symbol": instrument_id,
+                "granularity": interval_id,
+                "from": dt_to_timestamp(starttime, granularity="milliseconds"),
+                "to": dt_to_timestamp(endtime, granularity="milliseconds"),
             },
         )
+        reqs.append(req)
 
-    def _order_book_extract_response(self, response):
-        if response["code"] != "200000":
-            # Error has occured
+    responses = dispatcher.send_requests(reqs)
+    data = pd.DataFrame()
+    for response in responses:
+        try:
+            data = pd.concat(
+                [data, OHLCVInterface.extract_response_data(response, ["data"], ["code"], "200000", ["msg"], col_map)],
+                ignore_index=True,
+            )
+        except MissingDataError:
+            continue
+    return data
 
-            # Raise general exception for now
-            # TODO: build exception handling where reponse error can be fixed
-            raise Exception(response["msg"])
-        response = response["data"]
-        bids = pd.DataFrame(response["bids"], columns=[OrderBookSchema.price, OrderBookSchema.quantity]).assign(
-            **{OrderBookSchema.side: OrderBookSide.bid}
-        )
-        asks = pd.DataFrame(response["asks"], columns=[OrderBookSchema.price, OrderBookSchema.quantity]).assign(
-            **{OrderBookSchema.side: OrderBookSide.ask}
-        )
-        df = bids.merge(asks, how="outer").assign(
-            **{OrderBookSchema.timestamp: self.ET_to_datetime(response["ts"] / 1e6).replace(microsecond=0)}
-        )
-        return df
 
-    @cached("/tmp/cache/order_book_multiplier", is_method=True, instance_identifiers=["name"], log_level="DEBUG")
-    def _order_book_quantity_multiplier(self, symbol, instType, **kwargs):
-        request_url = os.path.join(self._base_url, f"contracts/{symbol}")
-        res = get(request_url).json()
-        return float(res["data"]["multiplier"])
+def ohlcv_spot(
+    dispatcher: Dispatcher,
+    url: str,
+    instrument_id: str,
+    interval_id: IntervalType,
+    starttimes: List[datetime.datetime],
+    endtimes: List[datetime.datetime],
+    limits: List[int],
+) -> pd.DataFrame:
+    col_map = {
+        0: OHLCVColumn.open_time,
+        1: OHLCVColumn.open,
+        3: OHLCVColumn.high,
+        4: OHLCVColumn.low,
+        2: OHLCVColumn.close,
+        5: OHLCVColumn.volume,
+    }
+    reqs = []
+    for starttime, endtime, limit in zip(starttimes, endtimes, limits):
+        req = Request(
+            "GET",
+            url,
+            params={
+                "symbol": instrument_id,
+                "type": interval_id,
+                "startAt": dt_to_timestamp(starttime, granularity="seconds"),
+                "endAt": dt_to_timestamp(endtime, granularity="seconds"),
+            },
+        )
+        reqs.append(req)
+
+    responses = dispatcher.send_requests(reqs)
+    data = pd.DataFrame()
+    for response in responses:
+        try:
+            data = pd.concat(
+                [data, OHLCVInterface.extract_response_data(response, ["data"], ["code"], "200000", ["msg"], col_map)],
+                ignore_index=True,
+            )
+        except MissingDataError:
+            continue
+    return data
+
+
+def funding_rate(
+    dispatcher: Dispatcher,
+    url: str,
+    instrument_id: str,
+    starttimes: List[datetime.datetime],
+    endtimes: List[datetime.datetime],
+    limits: List[int],
+):
+    col_map = {
+        "timesPoint": FundingRateSchema.timestamp,
+        "fundingRate": FundingRateSchema.funding_rate,
+    }
+    reqs = []
+    for starttime, endtime, limit in zip(starttimes, endtimes, limits):
+        req = Request(
+            "GET",
+            url,
+            params={
+                "symbol": instrument_id,
+                "startAt": dt_to_timestamp(starttime, granularity="milliseconds"),
+                "endAt": dt_to_timestamp(endtime, granularity="milliseconds"),
+                "forward": True,
+            },
+        )
+        reqs.append(req)
+
+    responses = dispatcher.send_requests(reqs)
+    data = pd.DataFrame()
+    for response in responses:
+        try:
+            data = pd.concat(
+                [
+                    data,
+                    FundingRateInterface.extract_response_data(
+                        response, ["data", "dataList"], ["code"], "200000", ["msg"], col_map
+                    ),
+                ],
+                ignore_index=True,
+            )
+        except MissingDataError:
+            continue
+    return data
+
+
+def order_book(dispatcher: Dispatcher, url: str, instrument_name: str, depth: int = 20) -> pd.DataFrame:
+    col_map = {
+        0: OrderBookSchema.price,
+        1: OrderBookSchema.quantity,
+    }
+    request = Request(
+        "GET",
+        url,
+        params={
+            "symbol": instrument_name,
+        },
+    )
+
+    response = dispatcher.send_request(request)
+    data = OrderBookInterface.extract_response_data(
+        response, ["data"], ["code"], "200000", ["msg"], col_map, ("bids", "asks")
+    )
+    return data
+
+
+def authenticate_request_spot(request: PreparedRequest) -> PreparedRequest:
+    API_KEY = os.environ["KUCOIN_SPOT_API_KEY"]
+    API_SECRET = os.environ["KUCOIN_SPOT_API_SECRET"]
+    API_PASSPHRASE = os.environ["KUCOIN_SPOT_API_PASSPHRASE"]
+    now = int(time.time() * 1000)
+    str_to_sign = str(now) + request.method + request.path_url + (request.body or "")
+    signature = base64.b64encode(
+        hmac.new(API_SECRET.encode("utf-8"), str_to_sign.encode("utf-8"), hashlib.sha256).digest()
+    )
+    passphrase = base64.b64encode(
+        hmac.new(API_SECRET.encode("utf-8"), API_PASSPHRASE.encode("utf-8"), hashlib.sha256).digest()
+    )
+    request.headers = {
+        "KC-API-SIGN": signature,
+        "KC-API-TIMESTAMP": str(now),
+        "KC-API-KEY": API_KEY,
+        "KC-API-PASSPHRASE": passphrase,
+        "KC-API-KEY-VERSION": "2",
+    }
+    return request
+
+
+def authenticate_request_perp(request: PreparedRequest) -> PreparedRequest:
+    API_KEY = os.environ["KUCOIN_FUTURES_API_KEY"]
+    API_SECRET = os.environ["KUCOIN_FUTURES_API_SECRET"]
+    API_PASSPHRASE = os.environ["KUCOIN_FUTURES_API_PASSPHRASE"]
+    now = int(time.time() * 1000)
+    str_to_sign = str(now) + request.method + request.path_url + (request.body or "")
+    signature = base64.b64encode(
+        hmac.new(API_SECRET.encode("utf-8"), str_to_sign.encode("utf-8"), hashlib.sha256).digest()
+    )
+    passphrase = base64.b64encode(
+        hmac.new(API_SECRET.encode("utf-8"), API_PASSPHRASE.encode("utf-8"), hashlib.sha256).digest()
+    )
+    request.headers = {
+        "KC-API-SIGN": signature,
+        "KC-API-TIMESTAMP": str(now),
+        "KC-API-KEY": API_KEY,
+        "KC-API-PASSPHRASE": passphrase,
+        "KC-API-KEY-VERSION": "2",
+    }
+    return request
+
+
+class Kucoin(ExchangeAPIBase):
+
+    name = "kucoin"
+    spot_base_url = "https://api.kucoin.com"
+    futures_base_url = "https://api-futures.kucoin.com"
+
+    perpetual_intervals = {
+        Interval.interval_1m: (1, datetime.timedelta(minutes=1)),
+        Interval.interval_5m: (5, datetime.timedelta(minutes=5)),
+        Interval.interval_15m: (15, datetime.timedelta(minutes=15)),
+        Interval.interval_1h: (60, datetime.timedelta(hours=1)),
+        Interval.interval_4h: (240, datetime.timedelta(hours=4)),
+        Interval.interval_8h: (480, datetime.timedelta(hours=8)),
+        Interval.interval_12h: (720, datetime.timedelta(hours=12)),
+        Interval.interval_1d: (1440, datetime.timedelta(days=1)),
+    }
+
+    spot_intervals = {
+        Interval.interval_1m: ("1min", datetime.timedelta(minutes=1)),
+        Interval.interval_5m: ("5min", datetime.timedelta(minutes=5)),
+        Interval.interval_15m: ("15min", datetime.timedelta(minutes=15)),
+        Interval.interval_1h: ("1hour", datetime.timedelta(hours=1)),
+        Interval.interval_4h: ("4hour", datetime.timedelta(hours=4)),
+        Interval.interval_8h: ("8hour", datetime.timedelta(hours=8)),
+        Interval.interval_12h: ("12hour", datetime.timedelta(hours=12)),
+        Interval.interval_1d: ("1day", datetime.timedelta(days=1)),
+    }
+
+    def __init__(self, cache_kwargs={"disabled": False, "refresh": False}, log_level: str = "INFO"):
+        super().__init__(cache_kwargs=cache_kwargs, log_level=log_level)
+        self.init_dispatchers()
+        self.init_instrument_info_interface()
+        self.init_ohlcv_interface()
+        self.init_funding_rate_interface()
+        self.init_order_book_interface()
+
+    def init_dispatchers(self):
+        self.logger.debug("initializing dispatchers")
+        self.perpetual_dispatcher = Dispatcher(
+            f"{self.name}.dispatcher.perpetual", timeout=1 / 10, pre_request_hook=authenticate_request_perp
+        )
+        self.spot_dispatcher = Dispatcher(
+            f"{self.name}.dispatcher.spot", timeout=1 / 10, pre_request_hook=authenticate_request_spot
+        )
+
+    def init_instrument_info_interface(self):
+        perpetual = InstrumentInfoInterface(
+            exchange=self,
+            interface_name=Interface.INSTRUMENT_INFO,
+            inst_type=InstrumentType.PERPETUAL,
+            url=os.path.join(self.futures_base_url, "api/v1/contracts/active"),
+            dispatcher=self.perpetual_dispatcher,
+            execute=instrument_info_perp,
+        )
+
+        spot = InstrumentInfoInterface(
+            exchange=self,
+            interface_name=Interface.INSTRUMENT_INFO,
+            inst_type=InstrumentType.SPOT,
+            url=os.path.join(self.spot_base_url, "api/v1/symbols"),
+            dispatcher=self.spot_dispatcher,
+            execute=instrument_info_spot,
+        )
+
+        self.interfaces[Interface.INSTRUMENT_INFO] = {
+            InstrumentType.PERPETUAL: perpetual,
+            InstrumentType.SPOT: spot,
+        }
+
+    def init_ohlcv_interface(self):
+        perpetual = OHLCVInterface(
+            intervals=self.perpetual_intervals,
+            max_response_limit=1500,
+            exchange=self,
+            interface_name=Interface.OHLCV,
+            inst_type=InstrumentType.PERPETUAL,
+            url=os.path.join(self.futures_base_url, "api/v1/kline/query"),
+            dispatcher=self.perpetual_dispatcher,
+            execute=ohlcv_perp,
+        )
+
+        spot = OHLCVInterface(
+            intervals=self.spot_intervals,
+            max_response_limit=1000,
+            exchange=self,
+            interface_name=Interface.OHLCV,
+            inst_type=InstrumentType.SPOT,
+            url=os.path.join(self.spot_base_url, "api/v1/market/candles"),
+            dispatcher=self.spot_dispatcher,
+            execute=ohlcv_spot,
+        )
+
+        self.interfaces[Interface.OHLCV] = {
+            InstrumentType.PERPETUAL: perpetual,
+            InstrumentType.SPOT: spot,
+        }
+
+    def init_funding_rate_interface(self):
+        perpetual = FundingRateInterface(
+            max_response_limit=200,
+            exchange=self,
+            interface_name=Interface.FUNDING_RATE,
+            inst_type=InstrumentType.PERPETUAL,
+            url=os.path.join(self.futures_base_url, "api/v1/funding-history"),
+            dispatcher=self.perpetual_dispatcher,
+            execute=funding_rate,
+        )
+
+        self.interfaces[Interface.FUNDING_RATE] = {InstrumentType.PERPETUAL: perpetual}
+
+    def init_order_book_interface(self):
+        perpetual = OrderBookInterface(
+            exchange=self,
+            interface_name=Interface.ORDER_BOOK,
+            inst_type=InstrumentType.PERPETUAL,
+            url=os.path.join(self.futures_base_url, "api/v1/level2/depth100"),
+            dispatcher=self.perpetual_dispatcher,
+            execute=order_book,
+        )
+
+        spot = OrderBookInterface(
+            exchange=self,
+            interface_name=Interface.ORDER_BOOK,
+            inst_type=InstrumentType.SPOT,
+            url=os.path.join(self.spot_base_url, "api/v3/market/orderbook/level2"),
+            dispatcher=self.spot_dispatcher,
+            execute=order_book,
+        )
+
+        self.interfaces[Interface.ORDER_BOOK] = {
+            InstrumentType.PERPETUAL: perpetual,
+            InstrumentType.SPOT: spot,
+        }
 
 
 _exchange_export = Kucoin

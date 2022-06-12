@@ -92,18 +92,18 @@ class FeedBase(pd.DataFrame):
         return super().set_index(OHLCVColumn.open_time)[columns].plot(title=self._underlying_info, **kwargs)
 
     def __str__(self):
-        return super().__str__() + self._underlying_info + "\n"
+        return super().__str__() + "\n" + self._underlying_info + "\n"
 
 
 class OHLCVFeed(FeedBase):
-    _metadata = ["exchange_name", "symbol", "instType", "interval", "orig_starttime", "orig_endtime"]
+    _metadata = ["exchange_name", "symbol", "inst_type", "interval", "orig_starttime", "orig_endtime"]
 
     def __init__(
         self,
         data=None,
         exchange_name: str = "",
         symbol: Symbol = None,
-        instType: InstrumentType = None,
+        inst_type: InstrumentType = None,
         interval: Interval = None,
         starttime: datetime.datetime = None,
         endtime: datetime.datetime = None,
@@ -114,14 +114,14 @@ class OHLCVFeed(FeedBase):
             data (pd.DataFrame, optional): Underlying dataframe object to wrap.
             exchange_name (str, optional): Name of the exchange this data is from. Defaults to "".
             symbol (Symbol, optional): Symbol for this data. Defaults to None.
-            instType (InstrumentType, optional): InstrumentType for this data. Defaults to None.
+            inst_type (InstrumentType, optional): InstrumentType for this data. Defaults to None.
             interval (Interval, optional): Interval for this data. Defaults to None.
             starttime (datetime.datetime, optional): Starttime for this data. Defaults to None.
             endtime (datetime.datetime, optional): Endtime for this data. Defaults to None.
         """
         self.exchange_name = exchange_name
         self.symbol = symbol
-        self.instType = instType
+        self.inst_type = inst_type
         self.interval = interval
         self.orig_starttime = starttime
         self.orig_endtime = endtime
@@ -135,7 +135,7 @@ class OHLCVFeed(FeedBase):
 
     @property
     def _underlying_info(self):
-        return f"{self.exchange_name}.{self.instType}.{self.symbol}"
+        return f"{self.exchange_name}.{self.inst_type}.{self.symbol}"
 
 
 class CSVFeed(OHLCVFeed):
@@ -145,7 +145,7 @@ class CSVFeed(OHLCVFeed):
         path: str = "",
         exchange_name: str = "",
         symbol: str = "",
-        instType: str = "",
+        inst_type: str = "",
         interval: str = "",
         column_map: dict = {},
     ):
@@ -156,7 +156,7 @@ class CSVFeed(OHLCVFeed):
             path (str): Path to CSV file
             exchange_name (str): Name of exchange this data is from
             symbol (str): Symbol for this data
-            instType (str): Instrument type for this data
+            inst_type (str): Instrument type for this data
             interval (str): Interval for this data
             column_map (dict, optional): mapping override of OHLCVColumn to the name present in CSV data. Defaults to {}.
         """
@@ -187,7 +187,7 @@ class CSVFeed(OHLCVFeed):
             data=df,
             exchange_name=exchange_name,
             symbol=symbol,
-            instType=instType,
+            inst_type=inst_type,
             interval=interval,
             starttime=starttime,
             endtime=endtime,
@@ -195,21 +195,21 @@ class CSVFeed(OHLCVFeed):
 
     @classmethod
     def from_directory(
-        cls, root_path: str, exchange_name: str, symbol: str, instType: str, interval: str, column_map: dict = {}
+        cls, root_path: str, exchange_name: str, symbol: str, inst_type: str, interval: str, column_map: dict = {}
     ):
-        """Use this constructor to create a feed using a directory structured by `root/exchange_name/symbol/instType/interval.csv`
+        """Use this constructor to create a feed using a directory structured by `root/exchange_name/symbol/inst_type/interval.csv`
 
         Args:
             root_path (str): Root directory path for data directory
             exchange_name (str): name of exchange as it appears on disk
             symbol (str): name of symbol as it appears on disk
-            instType (str): name of instType as it appears on disk
+            inst_type (str): name of inst_type as it appears on disk
             interval (str): name of interval as it appears on disk
             column_map (dict, optional): mapping override of OHLCVColumn to the name present in CSV data. Defaults to {}.
         """
 
-        file = os.path.exists(os.path.join(root_path, exchange_name, symbol, instType, f"{interval}.csv"))
+        file = os.path.exists(os.path.join(root_path, exchange_name, symbol, inst_type, f"{interval}.csv"))
         if not os.path.exists(file):
             raise FileNotFoundError("File not found:", file)
 
-        return cls(file, exchange_name, symbol, instType, interval, column_map)
+        return cls(file, exchange_name, symbol, inst_type, interval, column_map)
