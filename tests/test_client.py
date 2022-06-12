@@ -80,3 +80,19 @@ def test_orderbook(exchange: ExchangeAPIBase, symbol: Symbol, inst_type: Instrum
 
     if PRINT:
         print(orderbook)
+
+
+@pytest.mark.parametrize("inst_type", [InstrumentType.SPOT, InstrumentType.PERPETUAL])
+@pytest.mark.parametrize("symbol", [Symbol.BTC, Symbol.ADA, Symbol.DOGE])
+@pytest.mark.parametrize("interval", [Interval.interval_1d, Interval.interval_1h])
+@pytest.mark.parametrize(["starttime", "endtime"], [(datetime(2022, 5, 25), datetime(2022, 6, 3))])
+@pytest.mark.requires_http
+def test_funding_rate(exchange: ExchangeAPIBase, symbol: Symbol, starttime: datetime, endtime: datetime):
+    try:
+        df = exchange.funding_rate(symbol, starttime, endtime)
+        timedelta = exchange._get_interface("funding_rate", "perpetual").funding_interval
+        assert df.timestamp.iloc[0] == starttime
+        assert df.timestamp.iloc[-1] == endtime - timedelta
+        assert (len(df.dropna()) / len(df)) > 0.4, "Missing data"
+    except NotSupportedError as e:
+        pytest.skip(str(e))

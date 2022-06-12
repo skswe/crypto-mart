@@ -11,6 +11,7 @@ from dotenv import load_dotenv
 from requests import PreparedRequest, Request
 
 from ..enums import Instrument, InstrumentType, Interface, Interval, OrderBookSchema
+from ..errors import MissingDataError
 from ..feeds import OHLCVColumn
 from ..interfaces.funding_rate import FundingRateInterface
 from ..interfaces.instrument_info import InstrumentInfoInterface
@@ -32,10 +33,10 @@ def instrument_info_perp(dispatcher: Dispatcher, url: str) -> pd.DataFrame:
     }
     request = Request("GET", url)
     response = dispatcher.send_request(request)
-    df = InstrumentInfoInterface.handle_response(response, ["data"], ["code"], "200000", ["msg"], col_map)
-    df = df[df.status == "Open"]
-    df = df[df.isInverse == False]
-    return df
+    data = InstrumentInfoInterface.extract_response_data(response, ["data"], ["code"], "200000", ["msg"], col_map)
+    data = data[data.status == "Open"]
+    data = data[data.isInverse == False]
+    return data
 
 
 def instrument_info_spot(dispatcher: Dispatcher, url: str) -> pd.DataFrame:
@@ -45,9 +46,9 @@ def instrument_info_spot(dispatcher: Dispatcher, url: str) -> pd.DataFrame:
     }
     request = Request("GET", url)
     response = dispatcher.send_request(request)
-    df = InstrumentInfoInterface.handle_response(response, ["data"], ["code"], "200000", ["msg"], col_map)
-    df = df[df.enableTrading == True]
-    return df
+    data = InstrumentInfoInterface.extract_response_data(response, ["data"], ["code"], "200000", ["msg"], col_map)
+    data = data[data.enableTrading == True]
+    return data
 
 
 def ohlcv_perp(
@@ -82,7 +83,16 @@ def ohlcv_perp(
         reqs.append(req)
 
     responses = dispatcher.send_requests(reqs)
-    return OHLCVInterface.format_responses(responses, ["data"], ["code"], "200000", ["msg"], col_map)
+    data = pd.DataFrame()
+    for response in responses:
+        try:
+            data = pd.concat(
+                [data, OHLCVInterface.extract_response_data(response, ["data"], ["code"], "200000", ["msg"], col_map)],
+                ignore_index=True,
+            )
+        except MissingDataError:
+            continue
+    return data
 
 
 def ohlcv_spot(
@@ -117,7 +127,16 @@ def ohlcv_spot(
         reqs.append(req)
 
     responses = dispatcher.send_requests(reqs)
-    return OHLCVInterface.format_responses(responses, ["data"], ["code"], "200000", ["msg"], col_map)
+    data = pd.DataFrame()
+    for response in responses:
+        try:
+            data = pd.concat(
+                [data, OHLCVInterface.extract_response_data(response, ["data"], ["code"], "200000", ["msg"], col_map)],
+                ignore_index=True,
+            )
+        except MissingDataError:
+            continue
+    return data
 
 
 def funding_rate(
@@ -139,7 +158,21 @@ def funding_rate(
         reqs.append(req)
 
     responses = dispatcher.send_requests(reqs)
-    return FundingRateInterface.format_responses(responses, [], [], None, [], col_map)
+    data = pd.DataFrame()
+    for response in responses:
+        try:
+            data = pd.concat(
+                [
+                    data,
+                    FundingRateInterface.extract_response_data(
+                        response, ["data"], ["code"], "200000", ["msg"], col_map
+                    ),
+                ],
+                ignore_index=True,
+            )
+        except MissingDataError:
+            continue
+    return data
 
 
 def order_book(dispatcher: Dispatcher, url: str, instrument_name: str, depth: int = 20) -> pd.DataFrame:
@@ -156,10 +189,10 @@ def order_book(dispatcher: Dispatcher, url: str, instrument_name: str, depth: in
     )
 
     response = dispatcher.send_request(request)
-    orderbook = OrderBookInterface.handle_response(
+    data = OrderBookInterface.extract_response_data(
         response, ["data"], ["code"], "200000", ["msg"], col_map, ("bids", "asks")
     )
-    return orderbook
+    return data
 
 
 def authenticate_request_spot(request: PreparedRequest) -> PreparedRequest:

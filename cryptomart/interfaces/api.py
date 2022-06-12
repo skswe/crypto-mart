@@ -1,9 +1,10 @@
 import logging
-from typing import Any, Callable
+from typing import Any, Callable, Dict, List, Union
 
 import pandas as pd
-from cryptomart.errors import APIError
+from cryptomart.errors import APIError, MissingDataError
 from cryptomart.exchanges.base import ExchangeAPIBase
+from cryptomart.types import JSONDataType
 
 from ..enums import InstrumentType, Interface
 from ..util import Dispatcher
@@ -54,8 +55,33 @@ class APIInterface:
         self.dispatcher.logger.setLevel(level)
 
     @classmethod
-    def handle_response(cls, response, data_attrs, code_attrs, expected_code, err_msg_attrs, *args) -> pd.DataFrame:
-        """Automatically handle python parsed JSON response"""
+    def extract_response_data(
+        cls,
+        response: JSONDataType,
+        data_attrs: List[str],
+        code_attrs: List[str],
+        expected_code: Union[str, int, None],
+        err_msg_attrs: List[str],
+        *args,
+    ) -> Any:
+        """Check JSON response object for errors and return data portion of response or error message.
+
+        Args:
+            response (JSONDataType): Response object
+            data_attrs (List[str]): List of dict keys to index the data that needs to be extracted from the response object. Empty list if no indexing required.
+            code_attrs (List[str]): List of dict keys to index the response code to be compared with `expected_code`. Empty list of no response code available.
+            expected_code (Union[str, int]): Expected response code. `None` if no response code available.
+            err_msg_attrs (List[str]): List of dict keys to index an error message from the response object. Empty list of no error message available.
+            *args: Arguments passed to cls.data_to_df.
+
+        Raises:
+            APIError: When the response contains an invalid response code.
+            MissingDataError: Data is missing in the response.
+
+        Returns:
+            JSONDataType: extracted JSON data
+        """
+
         if code_attrs:
             # Check for provided code response
             code_response = response
@@ -74,7 +100,7 @@ class APIInterface:
         for attr in data_attrs:
             data_response = data_response[attr]
         try:
-            data_response = cls.parse_response(data_response, *args)
+            data_response = cls.data_to_df(data_response, *args)
         except KeyError as e:
             # Try to extract error message when unexpected error occurs. else just raise the error
             try:
@@ -87,4 +113,11 @@ class APIInterface:
             except KeyError:
                 raise e
 
-        return data_response
+    @classmethod
+    def data_to_df(cls, res: JSONDataType, col_map: dict) -> pd.DataFrame:
+        """Default method to format API response to standard dataframe"""
+        df = pd.DataFrame(res)
+        if df.empty:
+            raise MissingDataError
+        df.rename(columns=col_map, inplace=True)
+        return df[col_map.values()]

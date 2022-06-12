@@ -6,6 +6,7 @@ import pandas as pd
 from requests import Request
 
 from ..enums import Instrument, InstrumentType, Interface, Interval, OrderBookSchema
+from ..errors import MissingDataError
 from ..feeds import OHLCVColumn
 from ..interfaces.funding_rate import FundingRateInterface
 from ..interfaces.instrument_info import InstrumentInfoInterface
@@ -23,14 +24,14 @@ def instrument_info_perp(dispatcher: Dispatcher, url: str) -> pd.DataFrame:
     }
     request = Request("GET", url)
     response = dispatcher.send_request(request)
-    df = InstrumentInfoInterface.handle_response(response, ["result"], ["success"], True, ["error"], col_map)
-    df = df[df.enabled]
-    df = df[df.type == "future"]
-    df = df[~df.isEtfMarket]
-    df = df[~df.restricted]
+    data = InstrumentInfoInterface.extract_response_data(response, ["result"], ["success"], True, ["error"], col_map)
+    data = data[data.enabled]
+    data = data[data.type == "future"]
+    data = data[~data.isEtfMarket]
+    data = data[~data.restricted]
 
-    df = df[df.name.apply(lambda e: e.endswith("PERP"))]
-    return df
+    data = data[data.name.apply(lambda e: e.endswith("PERP"))]
+    return data
 
 
 def instrument_info_spot(dispatcher: Dispatcher, url: str) -> pd.DataFrame:
@@ -40,14 +41,14 @@ def instrument_info_spot(dispatcher: Dispatcher, url: str) -> pd.DataFrame:
     }
     request = Request("GET", url)
     response = dispatcher.send_request(request)
-    df = InstrumentInfoInterface.handle_response(response, ["result"], ["success"], True, ["error"], col_map)
-    df = df[df.enabled]
-    df = df[df.type == "spot"]
-    df = df[~df.isEtfMarket]
-    df = df[~df.restricted]
+    data = InstrumentInfoInterface.extract_response_data(response, ["result"], ["success"], True, ["error"], col_map)
+    data = data[data.enabled]
+    data = data[data.type == "spot"]
+    data = data[~data.isEtfMarket]
+    data = data[~data.restricted]
 
-    df = df[df.quoteCurrency == "USD"]
-    return df
+    data = data[data.quoteCurrency == "USD"]
+    return data
 
 
 def ohlcv(
@@ -81,7 +82,19 @@ def ohlcv(
         reqs.append(req)
 
     responses = dispatcher.send_requests(reqs)
-    return OHLCVInterface.format_responses(responses, ["result"], ["success"], True, ["error"], col_map)
+    data = pd.DataFrame()
+    for response in responses:
+        try:
+            data = pd.concat(
+                [
+                    data,
+                    OHLCVInterface.extract_response_data(response, ["result"], ["success"], True, ["error"], col_map),
+                ],
+                ignore_index=True,
+            )
+        except MissingDataError:
+            continue
+    return data
 
 
 def funding_rate(
@@ -103,7 +116,16 @@ def funding_rate(
         reqs.append(req)
 
     responses = dispatcher.send_requests(reqs)
-    return FundingRateInterface.format_responses(responses, [], [], None, [], col_map)
+    data = pd.DataFrame()
+    for response in responses:
+        try:
+            data = pd.concat(
+                [data, FundingRateInterface.extract_response_data(response, [], [], None, [], col_map)],
+                ignore_index=True,
+            )
+        except MissingDataError:
+            continue
+    return data
 
 
 def order_book(dispatcher: Dispatcher, url: str, instrument_id: str, depth: int = 20) -> pd.DataFrame:
@@ -119,10 +141,10 @@ def order_book(dispatcher: Dispatcher, url: str, instrument_id: str, depth: int 
         },
     )
     response = dispatcher.send_request(request)
-    orderbook = OrderBookInterface.handle_response(
+    data = OrderBookInterface.extract_response_data(
         response, ["result"], ["success"], True, ["error"], col_map, ("bids", "asks")
     )
-    return orderbook
+    return data
 
 
 class FTX(ExchangeAPIBase):

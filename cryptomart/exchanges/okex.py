@@ -6,6 +6,7 @@ import pandas as pd
 from requests import Request
 
 from ..enums import Instrument, InstrumentType, Interface, Interval, OrderBookSchema
+from ..errors import MissingDataError
 from ..feeds import OHLCVColumn
 from ..interfaces.funding_rate import FundingRateInterface
 from ..interfaces.instrument_info import InstrumentInfoInterface
@@ -29,11 +30,11 @@ def instrument_info_perp(dispatcher: Dispatcher, url: str) -> pd.DataFrame:
     request = Request("GET", url, params=params)
     response = dispatcher.send_request(request)
 
-    df = InstrumentInfoInterface.handle_response(response, ["data"], ["code"], "0", ["msg"], col_map)
-    df = df[df.state == "live"]
-    df = df[df.ctType == "linear"]
-    df = df[df.settleCcy == "USDT"]
-    return df
+    data = InstrumentInfoInterface.extract_response_data(response, ["data"], ["code"], "0", ["msg"], col_map)
+    data = data[data.state == "live"]
+    data = data[data.ctType == "linear"]
+    data = data[data.settleCcy == "USDT"]
+    return data
 
 
 def instrument_info_spot(dispatcher: Dispatcher, url: str) -> pd.DataFrame:
@@ -48,10 +49,10 @@ def instrument_info_spot(dispatcher: Dispatcher, url: str) -> pd.DataFrame:
     request = Request("GET", url, params=params)
     response = dispatcher.send_request(request)
 
-    df = InstrumentInfoInterface.handle_response(response, ["data"], ["code"], "0", ["msg"], col_map)
-    df = df[df.state == "live"]
-    df = df[df.quoteCcy == "USDT"]
-    return df
+    data = InstrumentInfoInterface.extract_response_data(response, ["data"], ["code"], "0", ["msg"], col_map)
+    data = data[data.state == "live"]
+    data = data[data.quoteCcy == "USDT"]
+    return data
 
 
 def ohlcv(
@@ -87,7 +88,16 @@ def ohlcv(
         reqs.append(req)
 
     responses = dispatcher.send_requests(reqs)
-    return OHLCVInterface.format_responses(responses, ["data"], ["code"], "0", ["msg"], col_map)
+    data = pd.DataFrame()
+    for response in responses:
+        try:
+            data = pd.concat(
+                [data, OHLCVInterface.extract_response_data(response, ["data"], ["code"], "0", ["msg"], col_map)],
+                ignore_index=True,
+            )
+        except MissingDataError:
+            continue
+    return data
 
 
 def funding_rate(
@@ -109,7 +119,19 @@ def funding_rate(
         reqs.append(req)
 
     responses = dispatcher.send_requests(reqs)
-    return FundingRateInterface.format_responses(responses, [], [], None, [], col_map)
+    data = pd.DataFrame()
+    for response in responses:
+        try:
+            data = pd.concat(
+                [
+                    data,
+                    FundingRateInterface.extract_response_data(response, ["data"], ["code"], "0", ["msg"], col_map),
+                ],
+                ignore_index=True,
+            )
+        except MissingDataError:
+            continue
+    return data
 
 
 def order_book(dispatcher: Dispatcher, url: str, instrument_id: str, depth: int = 20) -> pd.DataFrame:
@@ -127,10 +149,10 @@ def order_book(dispatcher: Dispatcher, url: str, instrument_id: str, depth: int 
     )
 
     response = dispatcher.send_request(request)
-    orderbook = OrderBookInterface.handle_response(
+    data = OrderBookInterface.extract_response_data(
         response, ["data", 0], ["code"], "0", ["msg"], col_map, ("bids", "asks")
     )
-    return orderbook
+    return data
 
 
 class OKEx(ExchangeAPIBase):

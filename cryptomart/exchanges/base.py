@@ -22,7 +22,7 @@ class ExchangeAPIBase(ABC):
         """Init the exchange
 
         Args:
-            cache_kwargs (dict, optional): Cache control settings. See pyutil.cache.cached for details.. Defaults to {"disabled": False, "refresh": False}.
+            cache_kwargs (dict, optional): Cache control settings. See pyutil.cache.cached for details. Defaults to {"disabled": False, "refresh": False}.
         """
         self.interfaces = {}
         self.logger = logging.getLogger(f"cryptomart.{self.name}")
@@ -108,7 +108,6 @@ class ExchangeAPIBase(ABC):
     def funding_rate(
         self,
         symbol: Symbol,
-        inst_type: InstrumentType,
         starttime: TimeType = None,
         endtime: TimeType = None,
         strict: bool = False,
@@ -130,7 +129,10 @@ class ExchangeAPIBase(ABC):
         """
         args = (symbol, starttime, endtime, strict)
         return self._run_interface(
-            Interface.FUNDING_RATE, inst_type, *args, cache_kwargs=dict(self.cache_kwargs, **cache_kwargs)
+            Interface.FUNDING_RATE,
+            inst_type=InstrumentType.PERPETUAL,
+            *args,
+            cache_kwargs=dict(self.cache_kwargs, **cache_kwargs),
         )
 
     def order_book(self, symbol: Symbol, inst_type: InstrumentType, depth: int = 20, cache_kwargs: dict = {}):

@@ -1,7 +1,5 @@
 import datetime
-import math
 import os
-from typing import List, Tuple
 
 import numpy as np
 import pandas as pd
@@ -10,7 +8,7 @@ from pyutil.cache import cached
 from ..enums import FundingRateSchema, Instrument, Symbol
 from ..errors import MissingDataError, NotSupportedError
 from ..types import TimeType
-from ..util import parse_time
+from ..util import get_request_intervals, parse_time
 from .api import APIInterface
 
 
@@ -82,9 +80,13 @@ class FundingRateInterface(APIInterface):
         instrument_id = self.instruments[symbol]
         limit = self.max_response_limit
 
-        start_times, end_times, limits = self.get_request_intervals(starttime, endtime, self.funding_interval, limit)
+        start_times, end_times, limits = get_request_intervals(
+            starttime, endtime, self.funding_interval, limit, self.start_inclusive, self.end_inclusive
+        )
+        self.logger.debug(f"start_times={start_times} | end_times={end_times} | limits={limits}")
 
         data = self.execute(self.dispatcher, self.url, instrument_id, start_times, end_times, limits)
+        data = data.sort_values(FundingRateSchema.timestamp, ascending=True)
         print("after execute", data)
 
         data[FundingRateSchema.timestamp] = data[FundingRateSchema.timestamp].apply(lambda e: parse_time(e))
@@ -119,104 +121,3 @@ class FundingRateInterface(APIInterface):
                     self.logger.warning(msg)
 
         return data
-
-    def get_request_intervals(
-        self,
-        starttime: datetime.datetime,
-        endtime: datetime.datetime,
-        timedelta: datetime.timedelta,
-        limit: int,
-    ) -> Tuple[List[int], List[datetime.datetime], List[datetime.datetime]]:
-        """Partition a time period into chunks of `timedelta * limit`
-
-        Returns:
-            Tuple[List[datetime.datetime], List[datetime.datetime], List[int]]: The starttime, endtime, count(timedelta) of each partition
-        """
-        effective_start_time, effective_end_time = self.snap_times(starttime, endtime, timedelta)
-
-        # Adjust endpoints
-        if self.start_inclusive == False:
-            # Start time must be immediately before
-            effective_start_time -= datetime.timedelta(seconds=1)
-        if self.end_inclusive == True:
-            # End time must be immediately before
-            effective_end_time -= datetime.timedelta(seconds=1)
-
-        cursor = effective_start_time
-        start_times: List[datetime.datetime] = [cursor]
-        end_times: List[datetime.datetime] = []
-        limits = []
-        while cursor < effective_end_time:
-            cursor += limit * timedelta
-
-            if cursor > effective_end_time:
-                end_times.append(effective_end_time)
-                final_limit = math.ceil((end_times[-1] - start_times[-1]) / timedelta)
-                limits.append(final_limit)
-            else:
-                end_times.append(cursor)
-                start_times.append(cursor)
-                limits.append(limit)
-
-        self.logger.debug(f"effective interval: ({effective_start_time}, {effective_end_time}), limits: {limits}")
-        return start_times, end_times, limits
-
-    @staticmethod
-    def snap_times(
-        a: datetime.datetime, b: datetime.datetime, interval: datetime.timedelta
-    ) -> Tuple[datetime.datetime, datetime.datetime]:
-        """Snap endpoints a and b to the time grid defined by `interval`
-
-        Args:
-            a (datetime.datetime): start time
-            b (datetime.datetime): end time
-            interval (datetime.timedelta): The time scale to snap times to
-
-        Returns:
-            Tuple[datetime.datetime, datetime.datetime]: Returns a new snapped interval of (a, b)
-        """
-        # datetime.datetime.min is the time origin (1, 1, 1, 0, 0)
-        # the time grid is the sequence of `interval`'s since the time origin, starting at the origin
-        # e.g. if `interval` is 1 day then the time grid is (1, 1, 1, 0, 0), (1, 2, 1, 0, 0), (1, 3, 1, 0, 0) ...
-        # remainder is the amount of time past a datetime in the time grid
-        time_min = datetime.datetime.min
-
-        remainder = (a - time_min) % interval
-        if remainder > datetime.timedelta(0):
-            # bump starttime up to next datetime in the time grid
-            starttime = a + (interval - remainder)
-        else:
-            starttime = a
-
-        remainder = (b - time_min) % interval
-        if remainder > datetime.timedelta(0):
-            # bump endtime back to previous datetime in the time grid
-            endtime = b - remainder
-        else:
-            endtime = b
-
-        return starttime, endtime
-
-    @classmethod
-    def format_responses(
-        cls, responses, data_attrs, code_attrs, expected_code, err_msg_attrs, col_map
-    ) -> pd.DataFrame:
-        """Automatically handle list of timeseries python parsed JSON responses"""
-        out = pd.DataFrame(columns=col_map.values())
-        for res in responses:
-            try:
-                df = cls.handle_response(res, data_attrs, code_attrs, expected_code, err_msg_attrs, col_map)
-                out = pd.concat([out, df], ignore_index=True)
-            except MissingDataError:
-                continue
-        return out.sort_values(FundingRateSchema.timestamp, ascending=True)
-
-    @staticmethod
-    def parse_response(res: dict, col_map: dict) -> pd.DataFrame:
-        """Format API response to standard dataframe"""
-        df = pd.DataFrame(res)
-        if df.empty:
-            raise MissingDataError
-        df.rename(columns=col_map, inplace=True)
-        print("raw from api", df)
-        return df[col_map.values()]

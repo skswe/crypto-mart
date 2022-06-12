@@ -49,8 +49,8 @@ class OrderBookInterface(APIInterface):
         orderbook = pd.concat([bids, asks], ignore_index=True)
         return orderbook
 
-    @staticmethod
-    def parse_response(res: dict, col_map: dict, split_keys: tuple) -> pd.DataFrame:
+    @classmethod
+    def data_to_df(cls, res: dict, col_map: dict, split_keys: tuple) -> pd.DataFrame:
         """Format API response to standard dataframe"""
         if split_keys:
             bid_key, ask_key = split_keys
@@ -67,4 +67,4 @@ class OrderBookInterface(APIInterface):
 
         df.rename(columns=col_map, inplace=True)
         df[OrderBookSchema.timestamp] = datetime.utcnow().replace(microsecond=0)
-        return df[OrderBookSchema._values()]
+        return df[col_map.values()]

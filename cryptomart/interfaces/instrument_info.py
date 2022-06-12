@@ -49,8 +49,8 @@ class InstrumentInfoInterface(APIInterface):
 
         return data
 
-    @staticmethod
-    def parse_response(data: dict, col_map: dict) -> pd.DataFrame:
+    @classmethod
+    def data_to_df(cls, data: dict, col_map: dict) -> pd.DataFrame:
         """Format API response to standard dataframe"""
         df = pd.DataFrame(data)
         if df.empty:
