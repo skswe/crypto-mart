@@ -10,7 +10,7 @@ import pandas as pd
 from dotenv import load_dotenv
 from requests import PreparedRequest, Request
 
-from ..enums import Instrument, InstrumentType, Interface, Interval, OrderBookSchema
+from ..enums import FundingRateSchema, Instrument, InstrumentType, Interface, Interval, OrderBookSchema
 from ..errors import MissingDataError
 from ..feeds import OHLCVColumn
 from ..interfaces.funding_rate import FundingRateInterface
@@ -147,13 +147,21 @@ def funding_rate(
     endtimes: List[datetime.datetime],
     limits: List[int],
 ):
-    col_map = {}
+    col_map = {
+        "timesPoint": FundingRateSchema.timestamp,
+        "fundingRate": FundingRateSchema.funding_rate,
+    }
     reqs = []
     for starttime, endtime, limit in zip(starttimes, endtimes, limits):
         req = Request(
             "GET",
             url,
-            params={},
+            params={
+                "symbol": instrument_id,
+                "startAt": dt_to_timestamp(starttime, granularity="milliseconds"),
+                "endAt": dt_to_timestamp(endtime, granularity="milliseconds"),
+                "forward": True,
+            },
         )
         reqs.append(req)
 
@@ -165,7 +173,7 @@ def funding_rate(
                 [
                     data,
                     FundingRateInterface.extract_response_data(
-                        response, ["data"], ["code"], "200000", ["msg"], col_map
+                        response, ["data", "dataList"], ["code"], "200000", ["msg"], col_map
                     ),
                 ],
                 ignore_index=True,
@@ -217,6 +225,28 @@ def authenticate_request_spot(request: PreparedRequest) -> PreparedRequest:
     return request
 
 
+def authenticate_request_perp(request: PreparedRequest) -> PreparedRequest:
+    API_KEY = os.environ["KUCOIN_FUTURES_API_KEY"]
+    API_SECRET = os.environ["KUCOIN_FUTURES_API_SECRET"]
+    API_PASSPHRASE = os.environ["KUCOIN_FUTURES_API_PASSPHRASE"]
+    now = int(time.time() * 1000)
+    str_to_sign = str(now) + request.method + request.path_url + (request.body or "")
+    signature = base64.b64encode(
+        hmac.new(API_SECRET.encode("utf-8"), str_to_sign.encode("utf-8"), hashlib.sha256).digest()
+    )
+    passphrase = base64.b64encode(
+        hmac.new(API_SECRET.encode("utf-8"), API_PASSPHRASE.encode("utf-8"), hashlib.sha256).digest()
+    )
+    request.headers = {
+        "KC-API-SIGN": signature,
+        "KC-API-TIMESTAMP": str(now),
+        "KC-API-KEY": API_KEY,
+        "KC-API-PASSPHRASE": passphrase,
+        "KC-API-KEY-VERSION": "2",
+    }
+    return request
+
+
 class Kucoin(ExchangeAPIBase):
 
     name = "kucoin"
@@ -250,13 +280,16 @@ class Kucoin(ExchangeAPIBase):
         self.init_dispatchers()
         self.init_instrument_info_interface()
         self.init_ohlcv_interface()
+        self.init_funding_rate_interface()
         self.init_order_book_interface()
 
     def init_dispatchers(self):
         self.logger.debug("initializing dispatchers")
-        self.perpetual_dispatcher = Dispatcher(f"{self.name}.dispatcher.perpetual", timeout=1 / 2)
+        self.perpetual_dispatcher = Dispatcher(
+            f"{self.name}.dispatcher.perpetual", timeout=1 / 10, pre_request_hook=authenticate_request_perp
+        )
         self.spot_dispatcher = Dispatcher(
-            f"{self.name}.dispatcher.spot", timeout=1 / 2, pre_request_hook=authenticate_request_spot
+            f"{self.name}.dispatcher.spot", timeout=1 / 10, pre_request_hook=authenticate_request_spot
         )
 
     def init_instrument_info_interface(self):
@@ -286,8 +319,6 @@ class Kucoin(ExchangeAPIBase):
     def init_ohlcv_interface(self):
         perpetual = OHLCVInterface(
             intervals=self.perpetual_intervals,
-            start_inclusive=True,
-            end_inclusive=True,
             max_response_limit=1500,
             exchange=self,
             interface_name=Interface.OHLCV,
@@ -299,8 +330,6 @@ class Kucoin(ExchangeAPIBase):
 
         spot = OHLCVInterface(
             intervals=self.spot_intervals,
-            start_inclusive=True,
-            end_inclusive=True,
             max_response_limit=1000,
             exchange=self,
             interface_name=Interface.OHLCV,
@@ -314,6 +343,19 @@ class Kucoin(ExchangeAPIBase):
             InstrumentType.PERPETUAL: perpetual,
             InstrumentType.SPOT: spot,
         }
+
+    def init_funding_rate_interface(self):
+        perpetual = FundingRateInterface(
+            max_response_limit=200,
+            exchange=self,
+            interface_name=Interface.FUNDING_RATE,
+            inst_type=InstrumentType.PERPETUAL,
+            url=os.path.join(self.futures_base_url, "api/v1/funding-history"),
+            dispatcher=self.perpetual_dispatcher,
+            execute=funding_rate,
+        )
+
+        self.interfaces[Interface.FUNDING_RATE] = {InstrumentType.PERPETUAL: perpetual}
 
     def init_order_book_interface(self):
         perpetual = OrderBookInterface(

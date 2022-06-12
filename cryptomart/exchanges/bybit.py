@@ -1,11 +1,12 @@
 import datetime
+import logging
 import os
 from typing import List
 
 import pandas as pd
 from requests import Request
 
-from ..enums import Instrument, InstrumentType, Interface, Interval, OrderBookSchema, OrderBookSide
+from ..enums import FundingRateSchema, Instrument, InstrumentType, Interface, Interval, OrderBookSchema, OrderBookSide
 from ..errors import MissingDataError
 from ..feeds import OHLCVColumn
 from ..interfaces.funding_rate import FundingRateInterface
@@ -104,6 +105,10 @@ def ohlcv_spot(
     endtimes: List[datetime.datetime],
     limits: List[int],
 ) -> pd.DataFrame:
+    logger = logging.getLogger("cryptomart.bybit.ohlcv.spot")
+    logger.warning(
+        f"ByBit only returns the latest 3500 datapoints for Spot OHLCV regardless of start and end times."
+    )
     col_map = {
         0: OHLCVColumn.open_time,
         1: OHLCVColumn.open,
@@ -151,26 +156,41 @@ def funding_rate(
     endtimes: List[datetime.datetime],
     limits: List[int],
 ):
-    col_map = {}
-    reqs = []
-    for starttime, endtime, limit in zip(starttimes, endtimes, limits):
-        req = Request(
-            "GET",
-            url,
-            params={},
-        )
-        reqs.append(req)
+    col_map = {
+        "time": FundingRateSchema.timestamp,
+        "value": FundingRateSchema.funding_rate,
+    }
 
-    responses = dispatcher.send_requests(reqs)
-    data = pd.DataFrame()
-    for response in responses:
-        try:
-            data = pd.concat(
-                [data, FundingRateInterface.extract_response_data(response, [], [], None, [], col_map)],
-                ignore_index=True,
-            )
-        except MissingDataError:
-            continue
+    # ByBit has no limit
+    starttime = starttimes[0]
+    endtime = endtimes[0]
+
+    def make_request(page):
+        params = {
+            "page": page,
+            "symbol": instrument_id,
+            "date": f"{starttime.strftime('%Y-%m-%d')} ~ {endtime.strftime('%Y-%m-%d')}",
+        }
+        return FundingRateInterface.extract_response_data(
+            dispatcher.send_request(Request("GET", url, params=params)),
+            ["result"],
+            ["ret_code"],
+            0,
+            ["ret_msg"],
+            raw=True,
+        )
+
+    first_res = make_request(1)
+    current_page = 1
+    last_page = first_res["last_page"]
+    data = pd.DataFrame(first_res["data"]).rename(columns=col_map)[col_map.values()]
+    while current_page < last_page:
+        next_res = make_request(current_page + 1)
+        current_page += 1
+
+        data = pd.concat(
+            [data, pd.DataFrame(next_res["data"]).rename(columns=col_map)[col_map.values()]], ignore_index=True
+        )
     return data
 
 
@@ -243,10 +263,10 @@ class Bybit(ExchangeAPIBase):
         self.init_dispatchers()
         self.init_instrument_info_interface()
         self.init_ohlcv_interface()
+        self.init_funding_rate_interface()
         self.init_order_book_interface()
 
     def init_dispatchers(self):
-        # Check which endpoints employ a limit
         self.logger.debug("initializing dispatchers")
         self.dispatcher = Dispatcher(f"{self.name}.dispatcher", timeout=1 / 40)
 
@@ -277,8 +297,6 @@ class Bybit(ExchangeAPIBase):
     def init_ohlcv_interface(self):
         perpetual = OHLCVInterface(
             intervals=self.intervals_perp,
-            start_inclusive=True,
-            end_inclusive=False,
             max_response_limit=200,
             exchange=self,
             interface_name=Interface.OHLCV,
@@ -290,8 +308,6 @@ class Bybit(ExchangeAPIBase):
 
         spot = OHLCVInterface(
             intervals=self.intervals_spot,
-            start_inclusive=False,
-            end_inclusive=False,
             max_response_limit=1000,
             exchange=self,
             interface_name=Interface.OHLCV,
@@ -305,6 +321,19 @@ class Bybit(ExchangeAPIBase):
             InstrumentType.PERPETUAL: perpetual,
             InstrumentType.SPOT: spot,
         }
+
+    def init_funding_rate_interface(self):
+        perpetual = FundingRateInterface(
+            max_response_limit=5000,
+            exchange=self,
+            interface_name=Interface.FUNDING_RATE,
+            inst_type=InstrumentType.PERPETUAL,
+            url="https://api2.bybit.com/linear/funding-rate/list",
+            dispatcher=self.dispatcher,
+            execute=funding_rate,
+        )
+
+        self.interfaces[Interface.FUNDING_RATE] = {InstrumentType.PERPETUAL: perpetual}
 
     def init_order_book_interface(self):
         perpetual = OrderBookInterface(

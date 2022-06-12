@@ -1,11 +1,12 @@
 import datetime
+import logging
 import os
 from typing import List
 
 import pandas as pd
 from requests import Request
 
-from ..enums import Instrument, InstrumentType, Interface, Interval, OrderBookSchema, OrderBookSide
+from ..enums import FundingRateSchema, Instrument, InstrumentType, Interface, Interval, OrderBookSchema, OrderBookSide
 from ..errors import MissingDataError
 from ..feeds import OHLCVColumn
 from ..interfaces.funding_rate import FundingRateInterface
@@ -142,26 +143,24 @@ def funding_rate(
     endtimes: List[datetime.datetime],
     limits: List[int],
 ):
-    col_map = {}
-    reqs = []
-    for starttime, endtime, limit in zip(starttimes, endtimes, limits):
-        req = Request(
-            "GET",
-            url,
-            params={},
-        )
-        reqs.append(req)
-
-    responses = dispatcher.send_requests(reqs)
-    data = pd.DataFrame()
-    for response in responses:
-        try:
-            data = pd.concat(
-                [data, FundingRateInterface.extract_response_data(response, [], [], None, ["message"], col_map)],
-                ignore_index=True,
-            )
-        except MissingDataError:
-            continue
+    logger = logging.getLogger("cryptomart.gateio.funding_rate.perpetual")
+    logger.warning(
+        f"GateIO only returns the latest 1000 datapoints for funding-rate regardless of start and end times."
+    )
+    col_map = {
+        "t": FundingRateSchema.timestamp,
+        "r": FundingRateSchema.funding_rate,
+    }
+    req = Request(
+        "GET",
+        url,
+        params={
+            "contract": instrument_id,
+            "limit": 1000,
+        },
+    )
+    response = dispatcher.send_request(req)
+    data = FundingRateInterface.extract_response_data(response, [], [], None, ["message"], col_map)
     return data
 
 
@@ -218,6 +217,7 @@ class GateIO(ExchangeAPIBase):
         self.init_dispatchers()
         self.init_instrument_info_interface()
         self.init_ohlcv_interface()
+        self.init_funding_rate_interface()
         self.init_order_book_interface()
 
     def init_dispatchers(self):
@@ -253,8 +253,6 @@ class GateIO(ExchangeAPIBase):
     def init_ohlcv_interface(self):
         perpetual = OHLCVInterface(
             intervals=self.intervals,
-            start_inclusive=True,
-            end_inclusive=True,
             max_response_limit=2000,
             exchange=self,
             interface_name=Interface.OHLCV,
@@ -266,8 +264,6 @@ class GateIO(ExchangeAPIBase):
 
         spot = OHLCVInterface(
             intervals=self.intervals,
-            start_inclusive=True,
-            end_inclusive=True,
             max_response_limit=1000,
             exchange=self,
             interface_name=Interface.OHLCV,
@@ -281,6 +277,19 @@ class GateIO(ExchangeAPIBase):
             InstrumentType.PERPETUAL: perpetual,
             InstrumentType.SPOT: spot,
         }
+
+    def init_funding_rate_interface(self):
+        perpetual = FundingRateInterface(
+            max_response_limit=1000,
+            exchange=self,
+            interface_name=Interface.FUNDING_RATE,
+            inst_type=InstrumentType.PERPETUAL,
+            url=os.path.join(self.base_url, "futures/usdt/funding_rate"),
+            dispatcher=self.perpetual_dispatcher,
+            execute=funding_rate,
+        )
+
+        self.interfaces[Interface.FUNDING_RATE] = {InstrumentType.PERPETUAL: perpetual}
 
     def init_order_book_interface(self):
         perpetual = OrderBookInterface(

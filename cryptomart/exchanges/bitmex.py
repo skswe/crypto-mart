@@ -6,7 +6,7 @@ from typing import List
 import pandas as pd
 from requests import Request
 
-from ..enums import Instrument, InstrumentType, Interface, Interval, OrderBookSchema, OrderBookSide
+from ..enums import FundingRateSchema, Instrument, InstrumentType, Interface, Interval, OrderBookSchema, OrderBookSide
 from ..errors import MissingDataError
 from ..feeds import OHLCVColumn
 from ..interfaces.funding_rate import FundingRateInterface
@@ -113,13 +113,21 @@ def funding_rate(
     endtimes: List[datetime.datetime],
     limits: List[int],
 ):
-    col_map = {}
+    col_map = {
+        "timestamp": FundingRateSchema.timestamp,
+        "fundingRate": FundingRateSchema.funding_rate,
+    }
     reqs = []
     for starttime, endtime, limit in zip(starttimes, endtimes, limits):
         req = Request(
             "GET",
             url,
-            params={},
+            params={
+                "symbol": instrument_id,
+                "startTime": starttime.strftime("%Y-%m-%d %H:%M:%S"),
+                "endTime": endtime.strftime("%Y-%m-%d %H:%M:%S"),
+                "count": limit,
+            },
         )
         reqs.append(req)
 
@@ -177,6 +185,7 @@ class BitMEX(ExchangeAPIBase):
         self.init_dispatchers()
         self.init_instrument_info_interface()
         self.init_ohlcv_interface()
+        self.init_funding_rate_interface()
         self.init_order_book_interface()
 
     def init_dispatchers(self):
@@ -211,8 +220,6 @@ class BitMEX(ExchangeAPIBase):
     def init_ohlcv_interface(self):
         perpetual = OHLCVInterface(
             intervals=self.intervals,
-            start_inclusive=True,
-            end_inclusive=True,
             max_response_limit=1000,
             exchange=self,
             interface_name=Interface.OHLCV,
@@ -224,8 +231,6 @@ class BitMEX(ExchangeAPIBase):
 
         spot = OHLCVInterface(
             intervals=self.intervals,
-            start_inclusive=True,
-            end_inclusive=True,
             max_response_limit=1000,
             exchange=self,
             interface_name=Interface.OHLCV,
@@ -239,6 +244,19 @@ class BitMEX(ExchangeAPIBase):
             InstrumentType.PERPETUAL: perpetual,
             InstrumentType.SPOT: spot,
         }
+
+    def init_funding_rate_interface(self):
+        perpetual = FundingRateInterface(
+            max_response_limit=1000,
+            exchange=self,
+            interface_name=Interface.FUNDING_RATE,
+            inst_type=InstrumentType.PERPETUAL,
+            url=os.path.join(self.base_url, "funding"),
+            dispatcher=self.dispatcher,
+            execute=funding_rate,
+        )
+
+        self.interfaces[Interface.FUNDING_RATE] = {InstrumentType.PERPETUAL: perpetual}
 
     def init_order_book_interface(self):
         perpetual = OrderBookInterface(

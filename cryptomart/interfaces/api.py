@@ -63,6 +63,7 @@ class APIInterface:
         expected_code: Union[str, int, None],
         err_msg_attrs: List[str],
         *args,
+        raw: bool=False,
     ) -> Any:
         """Check JSON response object for errors and return data portion of response or error message.
 
@@ -73,6 +74,7 @@ class APIInterface:
             expected_code (Union[str, int]): Expected response code. `None` if no response code available.
             err_msg_attrs (List[str]): List of dict keys to index an error message from the response object. Empty list of no error message available.
             *args: Arguments passed to cls.data_to_df.
+            raw (bool): If True, skips application of cls.data_to_df() to response. Default is False.
 
         Raises:
             APIError: When the response contains an invalid response code.
@@ -100,7 +102,10 @@ class APIInterface:
         for attr in data_attrs:
             data_response = data_response[attr]
         try:
-            data_response = cls.data_to_df(data_response, *args)
+            if raw:
+                return data_response
+            else:
+                return cls.data_to_df(data_response, *args)
         except KeyError as e:
             # Try to extract error message when unexpected error occurs. else just raise the error
             try:

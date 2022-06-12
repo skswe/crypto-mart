@@ -16,7 +16,7 @@ def int_to_dt(time: int) -> datetime.datetime:
     """Convert milliseconds, seconds, microseconds to datetime"""
     for denominator in [1, 1e3, 1e6]:
         try:
-            return datetime.datetime.utcfromtimestamp(time / denominator).replace(tzinfo=None)
+            return datetime.datetime.utcfromtimestamp(time / denominator).replace(tzinfo=None, microsecond=0)
         except (ValueError, AttributeError):
             continue
 
@@ -24,11 +24,11 @@ def int_to_dt(time: int) -> datetime.datetime:
 def parse_time(time: TimeType) -> datetime.datetime:
     """Convert TimeType to datetime"""
     if isinstance(time, pd.Timestamp):
-        return time.to_pydatetime().replace(tzinfo=None)
+        return time.to_pydatetime().replace(tzinfo=None, microsecond=0)
     elif isinstance(time, int) or isinstance(time, float):
         return int_to_dt(time)
     elif isinstance(time, datetime.datetime):
-        return time.replace(tzinfo=None)
+        return time.replace(tzinfo=None, microsecond=0)
     elif isinstance(time, tuple):
         return datetime.datetime(*time, tzinfo=None)
     elif isinstance(time, str):
@@ -38,7 +38,7 @@ def parse_time(time: TimeType) -> datetime.datetime:
             return int_to_dt(time)
         except ValueError:
             # time is a string time format
-            return pd.to_datetime(time).to_pydatetime().replace(tzinfo=None)
+            return pd.to_datetime(time).to_pydatetime().replace(tzinfo=None, microsecond=0)
 
 
 def dt_to_timestamp(dt: datetime.datetime, string=False, granularity="seconds") -> Union[str, int]:
@@ -105,23 +105,17 @@ def get_request_intervals(
     endtime: datetime.datetime,
     timedelta: datetime.timedelta,
     limit: int,
-    start_inclusive: bool,
-    end_inclusive: bool,
 ) -> Tuple[List[int], List[datetime.datetime], List[datetime.datetime]]:
     """Partition a time period into chunks of `timedelta * limit`
 
     Returns:
         Tuple[List[datetime.datetime], List[datetime.datetime], List[int]]: The starttime, endtime, count(timedelta) of each partition
     """
-    effective_start_time, effective_end_time = snap_times(starttime, endtime, timedelta)
+    TIME_BUFFER = {"seconds": 1}
 
-    # Adjust endpoints
-    if start_inclusive == False:
-        # Start time must be immediately before
-        effective_start_time -= datetime.timedelta(seconds=1)
-    if end_inclusive == True:
-        # End time must be immediately before
-        effective_end_time -= datetime.timedelta(seconds=1)
+    effective_start_time, effective_end_time = snap_times(starttime, endtime, timedelta)
+    effective_start_time -= datetime.timedelta(**TIME_BUFFER)
+    effective_end_time += datetime.timedelta(**TIME_BUFFER)
 
     cursor = effective_start_time
     start_times: List[datetime.datetime] = [cursor]

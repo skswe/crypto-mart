@@ -1,5 +1,6 @@
 import datetime
 import os
+from typing import Callable, Union
 
 import numpy as np
 import pandas as pd
@@ -17,9 +18,7 @@ class FundingRateInterface(APIInterface):
 
     def __init__(
         self,
-        start_inclusive: bool,
-        end_inclusive: bool,
-        max_response_limit: int,
+        max_response_limit: Union[int, Callable[[datetime.timedelta], int]],
         valid_data_threshold: float = 1,
         funding_interval: datetime.timedelta = datetime.timedelta(hours=8),
         **api_interface_kwargs,
@@ -27,16 +26,12 @@ class FundingRateInterface(APIInterface):
         """Initialize the interface
 
         Args:
-            start_inclusive (bool): `True` if the first open_time returned will match starttime parameter
-            end_inclusive (bool): `True` if the last open_time returned will match endtime parameter
             max_response_limit (int): Max number of rows that can be returned in one request to the API
             valid_data_threshold (float, optional): Percentage of data that must be present in the response. Depending on the
                 value of `strict` in the function call, either a warning will be logged or an exception will be raised. Defaults to 1.
         """
         super().__init__(**api_interface_kwargs)
         self.instruments = self.exchange.instrument_info(self.inst_type, map_column=Instrument.exchange_symbol)
-        self.start_inclusive = start_inclusive
-        self.end_inclusive = end_inclusive
         self.max_response_limit = max_response_limit
         self.valid_data_threshold = valid_data_threshold
         self.funding_interval = funding_interval
@@ -78,24 +73,36 @@ class FundingRateInterface(APIInterface):
             raise NotSupportedError(f"{self.name} does not support the given symbol or interval") from e
 
         instrument_id = self.instruments[symbol]
-        limit = self.max_response_limit
+        limit = (
+            self.max_response_limit
+            if not callable(self.max_response_limit)
+            else self.max_response_limit(self.funding_interval)
+        )
 
         start_times, end_times, limits = get_request_intervals(
-            starttime, endtime, self.funding_interval, limit, self.start_inclusive, self.end_inclusive
+            starttime,
+            endtime,
+            self.funding_interval,
+            limit,
         )
         self.logger.debug(f"start_times={start_times} | end_times={end_times} | limits={limits}")
 
         data = self.execute(self.dispatcher, self.url, instrument_id, start_times, end_times, limits)
+        if data.empty:
+            if strict:
+                raise MissingDataError("No data available for specified time period")
+            else:
+                self.logger.warning("No data available for specified time period")
+                return pd.DataFrame(
+                    {FundingRateSchema.timestamp: pd.date_range(starttime, endtime, freq=self.funding_interval)[:-1]},
+                    columns=FundingRateSchema._values(),
+                )
         data = data.sort_values(FundingRateSchema.timestamp, ascending=True)
-        print("after execute", data)
-
         data[FundingRateSchema.timestamp] = data[FundingRateSchema.timestamp].apply(lambda e: parse_time(e))
-        data = (
-            data.resample(self.funding_interval, on=FundingRateSchema.timestamp)
-            .median()
-            .drop(columns=FundingRateSchema.timestamp)
-        )
-        print("after resample", data)
+        data = data.set_index(FundingRateSchema.timestamp)
+
+        data = data.resample(self.funding_interval).median()
+
         # Fill missing rows / remove extra rows
         # remove the last index since we only care about open_time
         expected_index = pd.date_range(starttime, endtime, freq=self.funding_interval)[:-1]

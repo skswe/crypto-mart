@@ -18,7 +18,7 @@ class ExchangeAPIBase(ABC):
     def name() -> str:
         pass
 
-    def __init__(self, cache_kwargs: dict = {"disabled": False, "refresh": False}, log_level: str = "INFO"):
+    def __init__(self, cache_kwargs: dict = {"disabled": False, "refresh": False}, log_level: str = None):
         """Init the exchange
 
         Args:
@@ -26,7 +26,8 @@ class ExchangeAPIBase(ABC):
         """
         self.interfaces = {}
         self.logger = logging.getLogger(f"cryptomart.{self.name}")
-        self.log_level = log_level
+        if log_level:            
+            self.log_level = log_level
         self.logger.debug(f"Initializing {self.name}")
         self.cache_kwargs = cache_kwargs
 
@@ -130,7 +131,7 @@ class ExchangeAPIBase(ABC):
         args = (symbol, starttime, endtime, strict)
         return self._run_interface(
             Interface.FUNDING_RATE,
-            inst_type=InstrumentType.PERPETUAL,
+            InstrumentType.PERPETUAL,
             *args,
             cache_kwargs=dict(self.cache_kwargs, **cache_kwargs),
         )

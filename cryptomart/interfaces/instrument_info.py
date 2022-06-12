@@ -32,7 +32,7 @@ class InstrumentInfoInterface(APIInterface):
             pd.DataFrame: Instrument info or Mapping of `Symbol` enum to API instrument ID
         """
         data = self.execute(self.dispatcher, self.url)
-        data.cryptomart_symbol.replace(SYMBOL_ALIASES, inplace=True)
+        data[Instrument.cryptomart_symbol].replace(SYMBOL_ALIASES, inplace=True)
 
         for col in Instrument._values():
             if col not in data:

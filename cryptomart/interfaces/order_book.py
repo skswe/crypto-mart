@@ -29,7 +29,7 @@ class OrderBookInterface(APIInterface):
         instrument_id = self.instruments[symbol]
         multiplier = self.multipliers[symbol]
         data = self.execute(self.dispatcher, self.url, instrument_id, depth)
-
+        print(data)
         data[[OrderBookSchema.price, OrderBookSchema.quantity]] = data[
             [OrderBookSchema.price, OrderBookSchema.quantity]
         ].astype(float)
@@ -67,4 +67,4 @@ class OrderBookInterface(APIInterface):
 
         df.rename(columns=col_map, inplace=True)
         df[OrderBookSchema.timestamp] = datetime.utcnow().replace(microsecond=0)
-        return df[col_map.values()]
+        return df[OrderBookSchema._values()]

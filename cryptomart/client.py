@@ -6,8 +6,6 @@ import os
 from concurrent.futures import ThreadPoolExecutor
 from typing import List
 
-import pyutil
-
 from .enums import Exchange
 from .exchanges import FTX, Binance, BitMEX, Bybit, CoinFLEX, GateIO, Kucoin, OKEx
 from .exchanges.base import ExchangeAPIBase

@@ -207,8 +207,6 @@ class Binance(ExchangeAPIBase):
     def init_ohlcv_interface(self):
         perpetual = OHLCVInterface(
             intervals=self.intervals,
-            start_inclusive=True,
-            end_inclusive=True,
             max_response_limit=1500,
             exchange=self,
             interface_name=Interface.OHLCV,
@@ -220,8 +218,6 @@ class Binance(ExchangeAPIBase):
 
         spot = OHLCVInterface(
             intervals=self.intervals,
-            start_inclusive=True,
-            end_inclusive=True,
             max_response_limit=1000,
             exchange=self,
             interface_name=Interface.OHLCV,
@@ -238,8 +234,6 @@ class Binance(ExchangeAPIBase):
 
     def init_funding_rate_interface(self):
         perpetual = FundingRateInterface(
-            start_inclusive=True,
-            end_inclusive=True,
             max_response_limit=1000,
             exchange=self,
             interface_name=Interface.FUNDING_RATE,
