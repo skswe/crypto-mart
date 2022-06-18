@@ -17,7 +17,6 @@ class OHLCVColumn(NameEnum):
     low = "low"
     close = "close"
     volume = "volume"
-    returns = "returns"
 
 
 class FundingRateSchema(NameEnum):
