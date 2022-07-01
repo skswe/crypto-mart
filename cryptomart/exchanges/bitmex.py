@@ -191,7 +191,7 @@ class BitMEX(ExchangeAPIBase):
     def init_dispatchers(self):
         # Check which endpoints employ a limit
         self.logger.debug("initializing dispatchers")
-        self.dispatcher = Dispatcher(f"{self.name}.dispatcher", timeout=1 / 2)
+        self.dispatcher = Dispatcher(f"{self.name}.dispatcher", timeout=2)
 
     def init_instrument_info_interface(self):
         perpetual = InstrumentInfoInterface(
@@ -247,7 +247,7 @@ class BitMEX(ExchangeAPIBase):
 
     def init_funding_rate_interface(self):
         perpetual = FundingRateInterface(
-            max_response_limit=1000,
+            max_response_limit=500,
             exchange=self,
             interface_name=Interface.FUNDING_RATE,
             inst_type=InstrumentType.PERPETUAL,

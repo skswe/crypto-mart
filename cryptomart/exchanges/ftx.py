@@ -238,7 +238,7 @@ class FTX(ExchangeAPIBase):
 
     def init_funding_rate_interface(self):
         perpetual = FundingRateInterface(
-            max_response_limit=200,
+            max_response_limit=500,
             funding_interval=datetime.timedelta(hours=1),
             exchange=self,
             interface_name=Interface.FUNDING_RATE,
