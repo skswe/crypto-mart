@@ -8,6 +8,7 @@ from pyutil.cache import cached
 
 from ..enums import FundingRateSchema, Instrument, Symbol
 from ..errors import MissingDataError, NotSupportedError
+from ..feeds import FundingRateFeed
 from ..types import TimeType
 from ..util import get_request_intervals, parse_time
 from .api import APIInterface
@@ -40,6 +41,7 @@ class FundingRateInterface(APIInterface):
         os.path.join(os.getenv("CM_CACHE_PATH", "/tmp/cache"), "funding_rate"),
         is_method=True,
         instance_identifiers=["name"],
+        instance_path_seperators=["exchange_name", "inst_type"],
     )
     def run(
         self,
@@ -127,4 +129,4 @@ class FundingRateInterface(APIInterface):
                 else:
                     self.logger.warning(msg)
 
-        return data
+        return FundingRateFeed(data, self.exchange.name, symbol, self.funding_interval, starttime, endtime)
