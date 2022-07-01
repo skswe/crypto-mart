@@ -18,16 +18,15 @@ class ExchangeAPIBase(ABC):
     def name() -> str:
         pass
 
-    def __init__(self, cache_kwargs: dict = {"disabled": False, "refresh": False}, log_level: str = None):
+    def __init__(self, cache_kwargs: dict = {"disabled": False, "refresh": False}, log_level: str = "INFO"):
         """Init the exchange
 
         Args:
             cache_kwargs (dict, optional): Cache control settings. See pyutil.cache.cached for details. Defaults to {"disabled": False, "refresh": False}.
         """
         self.interfaces = {}
-        self.logger = logging.getLogger(f"cryptomart.{self.name}")
-        if log_level:            
-            self.log_level = log_level
+        self.logger = logging.getLogger(f"cryptomart.{self.name}")        
+        self.log_level = log_level
         self.logger.debug(f"Initializing {self.name}")
         self.cache_kwargs = cache_kwargs
 
