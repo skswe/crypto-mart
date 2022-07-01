@@ -4,9 +4,14 @@ import importlib
 import logging
 import os
 from concurrent.futures import ThreadPoolExecutor
-from typing import Dict, List
+from typing import Any, Dict, List, Union
 
-from .enums import Exchange
+import pandas as pd
+
+from cryptomart.feeds import OHLCVFeed
+from cryptomart.types import TimeType
+
+from .enums import Exchange, InstrumentType, Interval, Symbol
 from .exchanges import FTX, Binance, BitMEX, Bybit, CoinFLEX, GateIO, Kucoin, OKEx
 from .exchanges.base import ExchangeAPIBase
 from .globals import LOGGING_FORMATTER
@@ -67,6 +72,108 @@ class Client:
         if quiet:
             # Enable all logs
             logging.disable(logging.NOTSET)
+
+    def instrument_info(
+        self, exchange: Exchange, inst_type: InstrumentType, map_column: str = None, cache_kwargs: dict = {}
+    ) -> Union[pd.DataFrame, Dict[Symbol, Any]]:
+        """Get instrument info
+
+        Args:
+            exchange (Exchange): Registered exchange to call
+            inst_type (InstrumentType): Type of instrument to retrieve info for.
+            map_column (str): If provided, returns a dict of Symbol -> map_column.
+            cache_kwargs (dict): Optional cache control settings. See pyutil.cache.cached for details.
+        Returns:
+            Union[pd.DataFrame, Dict[Symbol, Any]]: Instrument info
+        """
+        return self._exchange_instance_map[exchange].instrument_info(
+            inst_type, map_column=map_column, cache_kwargs=cache_kwargs
+        )
+
+    def ohlcv(
+        self,
+        exchange: Exchange,
+        symbol: Symbol,
+        inst_type: InstrumentType,
+        interval: Interval = Interval.interval_1d,
+        starttime: TimeType = None,
+        endtime: TimeType = None,
+        strict: bool = False,
+        cache_kwargs: dict = {},
+    ) -> OHLCVFeed:
+        """Get historical OHLCV candlesticks
+
+        Args:
+            exchange (Exchange): Registered exchange to call
+            symbol (Symbol): Symbol to query
+            inst_type (InstrumentType): Type of instrument to query
+            interval (Interval): Interval or frequency of bars
+            starttime (TimeType): Time of the first open
+            endtime (TimeType): Time of the last close
+            strict (bool): If `True`, raises an exception when missing data is above threshold
+            cache_kwargs (dict): Optional cache control settings. See pyutil.cache.cached for details.
+        Raises:
+            NotSupportedError: If the given symbol, interval are not supported by the API
+            MissingDataError: If data does not meet self.valid_data_threshold and `strict=True`.
+
+        Returns:
+            OHLCVFeed: OHLCV dataframe with custom methods and properties
+        """
+        return self._exchange_instance_map[exchange].ohlcv(
+            inst_type,
+            interval=interval,
+            starttime=starttime,
+            endtime=endtime,
+            strict=strict,
+            cache_kwargs=cache_kwargs,
+        )
+
+    def funding_rate(
+        self,
+        exchange: Exchange,
+        symbol: Symbol,
+        starttime: TimeType = None,
+        endtime: TimeType = None,
+        strict: bool = False,
+        cache_kwargs: dict = {},
+    ) -> pd.DataFrame:
+        """Run main interface function
+
+        Args:
+            exchange (Exchange): Registered exchange to call
+            symbol (Symbol): Symbol to query
+            starttime (TimeType): Time of the first open
+            endtime (TimeType): Time of the last close
+            strict (bool): If `True`, raises an exception when missing data is above threshold
+        Raises:
+            NotSupportedError: If the given symbol is not supported by the API
+            MissingDataError: If data does not meet self.valid_data_threshold and `strict=True`.
+
+        Returns:
+            pd.DataFrame: funding rate dataframe
+        """
+        return self._exchange_instance_map[exchange].funding_rate(
+            symbol, starttime=starttime, endtime=endtime, strict=strict, cache_kwargs=cache_kwargs
+        )
+
+    def order_book(
+        self, exchange: Exchange, symbol: Symbol, inst_type: InstrumentType, depth: int = 20, cache_kwargs: dict = {}
+    ):
+        """Get orderbook snapshot
+
+        Args:
+            exchange (Exchange): Registered exchange to call
+            symbol (Symbol): Symbol to query
+            inst_type (InstrumentType): Type of instrument to query
+            depth (int): Number of bids/asks to include in the snapshot
+            cache_kwargs (dict): Optional cache control settings. See pyutil.cache.cached for details.
+
+        Returns:
+            pd.DataFrame: Orderbook
+        """
+        return self._exchange_instance_map[exchange].order_book(
+            symbol, inst_type, depth=depth, cache_kwargs=cache_kwargs
+        )
 
     @property
     def binance(self) -> Binance:
