@@ -7,3 +7,4 @@ line-length = 119
 
 [tool.pytest.ini_options]
 log_cli = false
+markers = ["requires_http"]

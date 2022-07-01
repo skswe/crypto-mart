@@ -1,5 +1,6 @@
 import logging
 
+from . import client, enums, errors, exchanges, feeds, globals, types, util
 from .client import Client
 from .enums import Exchange, InstrumentType, Interval, Symbol
 from .exchanges.base import ExchangeAPIBase

@@ -4,9 +4,7 @@ import importlib
 import logging
 import os
 from concurrent.futures import ThreadPoolExecutor
-from typing import List
-
-import pyutil
+from typing import Dict, List
 
 from .enums import Exchange
 from .exchanges import FTX, Binance, BitMEX, Bybit, CoinFLEX, GateIO, Kucoin, OKEx
@@ -22,9 +20,10 @@ class Client:
     def __init__(
         self,
         exchanges: List[Exchange] = Exchange._names(),
-        debug=False,
+        cache_kwargs: dict = {"disabled": False, "refresh": False},
+        log_level="INFO",
         log_file=None,
-        exchange_init_kwargs={},
+        quiet=False,
         **kwargs,
     ):
         """Unified interface to all registered Exchanges.
@@ -34,10 +33,17 @@ class Client:
             debug (bool, optional): [description]. Defaults to False.
             log_file (str, optional): file to save logs to. Defaults to None.
             exchange_init_kwargs: kwargs to pass to creation of each exchange object in `exchanges`
+            quiet: If True, hides initialization logs.
         """
-        if debug:
-            self.log_level = logging.DEBUG
-            pyutil.root_logger.setLevel(logging.DEBUG)
+        if quiet:
+            # Disables all logs at INFO or below
+            logging.disable(logging.INFO)
+
+        logger.info("=" * 80)
+        logger.info("Initializing client... (To hide initialization logs, pass quiet=True)")
+        self._cache_kwargs = cache_kwargs
+        logging.getLogger("cryptomart").setLevel(log_level)
+        logging.getLogger("pyutil").setLevel(log_level)
 
         if log_file is not None:
             if os.path.exists(log_file):
@@ -52,9 +58,15 @@ class Client:
             assert exchange in Exchange._names(), f"{exchange} is not registered as an Exchange"
 
         self._active_exchanges = [getattr(Exchange, e) for e in exchanges]
-        self._exchange_instance_map = {}
+        self._exchange_instance_map: Dict[Exchange, ExchangeAPIBase] = {}
         self._exchange_class_map = {}
-        self._load_exchanges(debug=debug, **exchange_init_kwargs)
+        self._load_exchanges(cache_kwargs=cache_kwargs, log_level=log_level)
+        logger.info("Client initialized")
+        logger.info("=" * 80)
+
+        if quiet:
+            # Enable all logs
+            logging.disable(logging.NOTSET)
 
     @property
     def binance(self) -> Binance:
@@ -118,6 +130,18 @@ class Client:
     def log_level(self, level):
         logging.getLogger("cryptomart").setLevel(level)
         logging.getLogger("pyutil").setLevel(level)
+        for exch in self._exchange_instance_map.values():
+            exch.log_level = level
+
+    @property
+    def cache_kwargs(self):
+        return self._cache_kwargs
+
+    @cache_kwargs.setter
+    def cache_kwargs(self, cache_kwargs):
+        self._cache_kwargs = cache_kwargs
+        for exch in self._exchange_instance_map.values():
+            exch.cache_kwargs = cache_kwargs
 
     @property
     def exchanges(self):

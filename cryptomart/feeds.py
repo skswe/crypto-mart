@@ -2,9 +2,12 @@ import datetime
 import logging
 import os
 
+import numpy as np
 import pandas as pd
+from pandas.core.internals import BlockManager
 
-from .enums import InstrumentType, Interval, OHLCVColumn, Symbol
+from .enums import FundingRateSchema, InstrumentType, Interval, OHLCVColumn, Symbol
+from .util import parse_time
 
 logger = logging.getLogger(__name__)
 
@@ -19,21 +22,35 @@ def copy_metadata(func):
     return wrapper
 
 
-class FeedBase(pd.DataFrame):
+class TSFeedBase(pd.DataFrame):
     # Important note about subclassing a dataframe:
     # On some pandas dataframe operations, __init__ will be invoked with the original dataframe
-    # as the first argument.
+    # as with a keyword argument with name `data` or the first argument.
     # Thus, all subclasses of FeedBase that implement __init__ must have `data` as the
-    # very first argument and also as a keyword argument. __init__ must handle the case
-    # where this data kwarg is provided, and invoke the DataFrame constructor with super().__init__(data=data).
-
-    # This also means that subclasses implementing __init__ must not take any position arguments. Since
-    # a pandas operation might trigger __init__ without passing the expected position arguments.
+    # very first argument and also as a keyword argument. This also means that subclasses implementing
+    # __init__ must not take any positional arguments. Since a pandas operation might trigger __init__
+    # without passing the expected positional arguments.
 
     # You may also ask "What if my constructor requires keyword arguments which pandas does not supply
     # when __init__ is triggered?" Simply override and decorate any dataframe operations that trigger __init__
     # with `@copy_metadata`. This decorator will copy all of the attributes from the original dataframe to the
     # newly constructed dataframe after the resulting dataframe operation completes.
+    _metadata = ["time_column", "value_column", "timedelta"]
+
+    def __init__(self, data=None, time_column=None, value_column=None, timedelta=None):
+        """Timeseries Feed Base - properties and methods for working with a DataFrame that represents some sort of constant time series
+
+        Args:
+            data: Underlying dataframe. Defaults to None.
+            time_column: Column that contains the time index. Defaults to None.
+            value_column: Column(s) that represents the value(s). Defaults to None.
+        """
+        super().__init__(data=data)
+
+        self.time_column = time_column
+        self.value_column = value_column
+        self.timedelta = timedelta
+
     @classmethod
     def _pandas_constructor(cls, *args, **kwargs):
         return cls(*args, **kwargs)
@@ -48,18 +65,30 @@ class FeedBase(pd.DataFrame):
         if self.empty:
             return None
 
-        return self[~self[OHLCVColumn.open].isna()].iloc[0][OHLCVColumn.open_time]
+        return self[~self[self.value_column].isna()].iloc[0][self.time_column]
 
     @property
     def latest_time(self):
         if self.empty:
             return None
 
-        return self[~self[OHLCVColumn.open].isna()].iloc[-1][OHLCVColumn.open_time]
+        return self[~self[self.value_column].isna()].iloc[-1][self.time_column]
 
     @property
     def missing_indices(self):
-        return self[self[OHLCVColumn.open].isna()].index
+        return self[self[self.value_column].isna()].index
+
+    @property
+    def missing_rows(self):
+        return self.loc[self.missing_indices]
+
+    @property
+    def valid_indices(self):
+        return self[self[self.value_column].notna()].index
+
+    @property
+    def valid_rows(self):
+        return self.loc[self.valid_indices]
 
     @property
     def missing_rows(self):
@@ -68,9 +97,9 @@ class FeedBase(pd.DataFrame):
     @property
     def gaps(self):
         return (
-            self[self[OHLCVColumn.open].notna()][OHLCVColumn.open_time]
+            self[self[self.value_column].notna()][self.time_column]
             .diff()
-            .pipe(lambda series: series[series > pd.Timedelta("1 days")])
+            .pipe(lambda series: series[series > self.timedelta])
             .count()
         )
 
@@ -88,23 +117,31 @@ class FeedBase(pd.DataFrame):
 
     def display(self, columns=OHLCVColumn.open, **kwargs):
         if columns == "all":
-            columns = [column.name for column in OHLCVColumn if column not in [OHLCVColumn.open_time]]
-        return super().set_index(OHLCVColumn.open_time)[columns].plot(title=self._underlying_info, **kwargs)
+            columns = [column for column in self.columns if column not in [self.time_column]]
+        return super().set_index(self.time_column)[columns].plot(title=self._underlying_info, **kwargs)
 
     def __str__(self):
-        return super().__str__() + self._underlying_info + "\n"
+        return super().__str__() + "\n" + self._underlying_info + "\n"
 
 
-class OHLCVFeed(FeedBase):
-    _metadata = ["exchange_name", "symbol", "instType", "interval", "orig_starttime", "orig_endtime"]
+class OHLCVFeed(TSFeedBase):
+    _metadata = TSFeedBase._metadata + [
+        "exchange_name",
+        "symbol",
+        "inst_type",
+        "interval",
+        "orig_starttime",
+        "orig_endtime",
+    ]
 
     def __init__(
         self,
         data=None,
         exchange_name: str = "",
         symbol: Symbol = None,
-        instType: InstrumentType = None,
+        inst_type: InstrumentType = None,
         interval: Interval = None,
+        timedelta: datetime.timedelta = None,
         starttime: datetime.datetime = None,
         endtime: datetime.datetime = None,
     ):
@@ -114,38 +151,30 @@ class OHLCVFeed(FeedBase):
             data (pd.DataFrame, optional): Underlying dataframe object to wrap.
             exchange_name (str, optional): Name of the exchange this data is from. Defaults to "".
             symbol (Symbol, optional): Symbol for this data. Defaults to None.
-            instType (InstrumentType, optional): InstrumentType for this data. Defaults to None.
+            inst_type (InstrumentType, optional): InstrumentType for this data. Defaults to None.
             interval (Interval, optional): Interval for this data. Defaults to None.
+            timedelta (datetime.timedelta, optional): Timedelta for this data. Defaults to None.
             starttime (datetime.datetime, optional): Starttime for this data. Defaults to None.
             endtime (datetime.datetime, optional): Endtime for this data. Defaults to None.
         """
+        super().__init__(
+            data=data, time_column=OHLCVColumn.open_time, value_column=OHLCVColumn.open, timedelta=timedelta
+        )
+
         self.exchange_name = exchange_name
         self.symbol = symbol
-        self.instType = instType
+        self.inst_type = inst_type
         self.interval = interval
         self.orig_starttime = starttime
         self.orig_endtime = endtime
 
-        if isinstance(data, pd.DataFrame):
-            # Returns = the % gain on close from one bar to the next
-            metric_column = data[OHLCVColumn.close]
-            data[OHLCVColumn.returns] = ((metric_column - metric_column.shift(1)) / metric_column.shift(1)) * 100
-
-        super().__init__(data=data)
-
-    @property
-    def _underlying_info(self):
-        return f"{self.exchange_name}.{self.instType}.{self.symbol}"
-
-
-class CSVFeed(OHLCVFeed):
-    def __init__(
-        self,
-        data=None,
+    @classmethod
+    def from_csv(
+        cls,
         path: str = "",
         exchange_name: str = "",
         symbol: str = "",
-        instType: str = "",
+        inst_type: str = "",
         interval: str = "",
         column_map: dict = {},
     ):
@@ -156,14 +185,10 @@ class CSVFeed(OHLCVFeed):
             path (str): Path to CSV file
             exchange_name (str): Name of exchange this data is from
             symbol (str): Symbol for this data
-            instType (str): Instrument type for this data
+            inst_type (str): Instrument type for this data
             interval (str): Interval for this data
             column_map (dict, optional): mapping override of OHLCVColumn to the name present in CSV data. Defaults to {}.
         """
-
-        if data is not None:
-            return super().__init__(data=data)
-
         # Default map of unified column name to column name present in CSV data
         _column_map = {
             OHLCVColumn.open_time: "open_time",
@@ -180,36 +205,100 @@ class CSVFeed(OHLCVFeed):
         df = pd.read_csv(path)
 
         df = df.rename(columns=_column_map).reindex(columns=_column_map.keys())
-        starttime = df[df.open.notna()].iloc[0]["open_time"]
-        endtime = df[df.open.notna()].iloc[-1]["open_time"]
 
-        super().__init__(
+        df = df.sort_values(OHLCVColumn.open_time, ascending=True)
+
+        df[OHLCVColumn.open_time] = df[OHLCVColumn.open_time].apply(lambda e: parse_time(e))
+        starttime = df.iloc[0][OHLCVColumn.open_time]
+        endtime = df.iloc[-1][OHLCVColumn.open_time]
+        timedelta = df[OHLCVColumn.open_time].diff().quantile(0).to_pytimedelta()
+
+        # Fill missing rows / remove extra rows
+        # remove the last index since we only care about open_time
+        expected_index = pd.date_range(starttime, endtime, freq=timedelta)[:-1]
+
+        # Drop duplicate open_time axis
+        df = df.groupby(OHLCVColumn.open_time).first()
+
+        # Forces index to [starttime, endtime], adding nulls where necessary
+        df = df.reindex(expected_index).reset_index().rename(columns={"index": OHLCVColumn.open_time})
+
+        # Convert columns to float
+        df[np.setdiff1d(df.columns, OHLCVColumn.open_time)] = df[
+            np.setdiff1d(df.columns, OHLCVColumn.open_time)
+        ].astype(float)
+
+        return cls(
             data=df,
             exchange_name=exchange_name,
             symbol=symbol,
-            instType=instType,
+            inst_type=inst_type,
             interval=interval,
+            timedelta=timedelta,
             starttime=starttime,
             endtime=endtime,
         )
 
     @classmethod
     def from_directory(
-        cls, root_path: str, exchange_name: str, symbol: str, instType: str, interval: str, column_map: dict = {}
+        cls, root_path: str, exchange_name: str, symbol: str, inst_type: str, interval: str, column_map: dict = {}
     ):
-        """Use this constructor to create a feed using a directory structured by `root/exchange_name/symbol/instType/interval.csv`
+        """Use this constructor to create a feed using a directory structured by `root/exchange_name/symbol/inst_type/interval.csv`
 
         Args:
             root_path (str): Root directory path for data directory
             exchange_name (str): name of exchange as it appears on disk
             symbol (str): name of symbol as it appears on disk
-            instType (str): name of instType as it appears on disk
+            inst_type (str): name of inst_type as it appears on disk
             interval (str): name of interval as it appears on disk
             column_map (dict, optional): mapping override of OHLCVColumn to the name present in CSV data. Defaults to {}.
         """
 
-        file = os.path.exists(os.path.join(root_path, exchange_name, symbol, instType, f"{interval}.csv"))
+        file = os.path.exists(os.path.join(root_path, exchange_name, symbol, inst_type, f"{interval}.csv"))
         if not os.path.exists(file):
             raise FileNotFoundError("File not found:", file)
 
-        return cls(file, exchange_name, symbol, instType, interval, column_map)
+        return cls.from_csv(file, exchange_name, symbol, inst_type, interval, column_map)
+
+    @property
+    def _underlying_info(self):
+        return f"ohlcv.{self.exchange_name}.{self.inst_type}.{self.symbol}"
+
+
+class FundingRateFeed(TSFeedBase):
+    _metadata = TSFeedBase._metadata + ["exchange_name", "symbol", "orig_starttime", "orig_endtime"]
+
+    def __init__(
+        self,
+        data=None,
+        exchange_name: str = "",
+        symbol: Symbol = None,
+        timedelta: datetime.timedelta = None,
+        starttime: datetime.datetime = None,
+        endtime: datetime.datetime = None,
+    ):
+        """Create an Funding Rate Feed from a DataFrame. This class provides additional DataFrame operations and provides metadata about the feed.
+
+        Args:
+            data (pd.DataFrame, optional): Underlying dataframe object to wrap.
+            exchange_name (str, optional): Name of the exchange this data is from. Defaults to "".
+            symbol (Symbol, optional): Symbol for this data. Defaults to None.
+            timedelta (datetime.timedelta, optional): Timedelta for this data. Defaults to None.
+            starttime (datetime.datetime, optional): Starttime for this data. Defaults to None.
+            endtime (datetime.datetime, optional): Endtime for this data. Defaults to None.
+        """
+        super().__init__(
+            data=data,
+            time_column=FundingRateSchema.timestamp,
+            value_column=FundingRateSchema.funding_rate,
+            timedelta=timedelta,
+        )
+
+        self.exchange_name = exchange_name
+        self.symbol = symbol
+        self.orig_starttime = starttime
+        self.orig_endtime = endtime
+
+    @property
+    def _underlying_info(self):
+        return f"funding_rate.{self.exchange_name}.{self.symbol}"

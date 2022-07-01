@@ -1,3 +1,4 @@
+from . import binance, bitmex, bybit, coinflex, ftx, gateio, kucoin, okex
 from .binance import Binance
 from .bitmex import BitMEX
 from .bybit import Bybit

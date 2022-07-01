@@ -29,33 +29,33 @@ import cryptomart as cm
 client = cm.Client()
 
 symbol = "BTC"
-instType = "perpetual"
+inst_type = "perpetual"
 interval = cm.Interval.interval_1d
 starttime = "2021-07-15"
 endtime = "2022-4-30"
 
-client.binance.ohlcv(symbol, instType, interval, starttime, endtime)
+client.binance.ohlcv(symbol, inst_type, interval, starttime, endtime)
 ```
 
 Out: 
 ```
-     open_time      open      high       low     close      volume   returns
-0   2021-07-15  32803.00  33170.00  31140.00  31866.43  539111.667       NaN
-1   2021-07-16  31865.53  32245.00  31018.59  31382.95  516577.743 -1.517208
-2   2021-07-17  31382.96  31945.00  31150.02  31496.65  422650.418  0.362299
-3   2021-07-18  31496.65  32435.93  31075.10  31767.00  412189.401  0.858345
-4   2021-07-19  31765.23  31890.00  30358.77  30823.62  486305.627 -2.969686
-..         ...       ...       ...       ...       ...         ...       ...
-284 2022-04-25  39433.40  40650.00  38111.00  40411.00  448877.893  2.479117
-285 2022-04-26  40411.00  40800.00  37671.80  38093.70  453132.198 -5.734330
-286 2022-04-27  38093.70  39470.00  37844.50  39209.00  385645.365  2.927781
-287 2022-04-28  39209.00  40376.60  38861.80  39732.50  413543.408  1.335153
-288 2022-04-29  39732.50  39924.80  38160.00  38572.20  308116.375 -2.920279
+     open_time      open      high       low     close      volume
+0   2021-07-15  32803.00  33170.00  31140.00  31866.43  539111.667
+1   2021-07-16  31865.53  32245.00  31018.59  31382.95  516577.743
+2   2021-07-17  31382.96  31945.00  31150.02  31496.65  422650.418
+3   2021-07-18  31496.65  32435.93  31075.10  31767.00  412189.401
+4   2021-07-19  31765.23  31890.00  30358.77  30823.62  486305.627
+..         ...       ...       ...       ...       ...         ...
+284 2022-04-25  39433.40  40650.00  38111.00  40411.00  448877.893
+285 2022-04-26  40411.00  40800.00  37671.80  38093.70  453132.198
+286 2022-04-27  38093.70  39470.00  37844.50  39209.00  385645.365
+287 2022-04-28  39209.00  40376.60  38861.80  39732.50  413543.408
+288 2022-04-29  39732.50  39924.80  38160.00  38572.20  308116.375
 
 [289 rows x 7 columns]
 ```
 
-OHLCV Historical data is automatically cached to the disk at `/tmp/cache`. This can be disabled by passing the `disable_cache=True` parameter to the `ohlcv` call.
+OHLCV Historical data is automatically cached to the disk at `/tmp/cache`. This can be disabled by passing the `cache_kwargs={"disabled": True}` parameter to the `ohlcv` call.
 
 ## Order Book Snapshot
 
@@ -65,10 +65,10 @@ import cryptomart as cm
 client = cm.Client()
 
 symbol = "BTC"
-instType = "perpetual"
+inst_type = "perpetual"
 depth = 20
 
-client.binance.order_book(symbol, instType, depth)
+client.binance.order_book(symbol, inst_type, depth)
 ```
 
 Out: 
