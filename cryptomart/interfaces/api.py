@@ -34,6 +34,7 @@ class APIInterface:
             dispatcher (Dispatcher): Dispatcher object to handle http requests for this interface
         """
         self.exchange = exchange
+        self.exchange_name = exchange.name
         self.interface_name = interface_name
         self.inst_type = inst_type
         self.url = url

@@ -42,6 +42,7 @@ class OHLCVInterface(APIInterface):
         os.path.join(os.getenv("CM_CACHE_PATH", "/tmp/cache"), "ohlcv"),
         is_method=True,
         instance_identifiers=["name"],
+        instance_path_seperators=["exchange_name", "inst_type"],
     )
     def run(
         self,
@@ -124,4 +125,4 @@ class OHLCVInterface(APIInterface):
                 else:
                     self.logger.warning(msg)
 
-        return OHLCVFeed(data, self.exchange.name, symbol, self.inst_type, interval, starttime, endtime)
+        return OHLCVFeed(data, self.exchange.name, symbol, self.inst_type, interval, timedelta, starttime, endtime)

@@ -22,6 +22,7 @@ class InstrumentInfoInterface(APIInterface):
         os.path.join(os.getenv("CM_CACHE_PATH", "/tmp/cache"), "instrument_info"),
         is_method=True,
         instance_identifiers=["name"],
+        instance_path_seperators=["exchange_name", "inst_type"],
     )
     def run(self, map_column: str, **cache_kwargs) -> Union[pd.DataFrame, Dict[Symbol, str]]:
         """Run main interface function
