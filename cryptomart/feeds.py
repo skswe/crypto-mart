@@ -116,10 +116,10 @@ class TSFeedBase(pd.DataFrame):
     def merge(self, *args, **kwargs) -> TSFeedBase:
         return super().merge(*args, **kwargs)
 
-    def display(self, columns=OHLCVColumn.open, **kwargs):
-        if columns == "all":
-            columns = [column for column in self.columns if column not in [self.time_column]]
-        return super().set_index(self.time_column)[columns].plot(title=self._underlying_info, **kwargs)
+    def plot(self, *args, **kwargs):
+        return (
+            pd.DataFrame(self.set_index(self.time_column)).dropna().plot(*args, title=self._underlying_info, **kwargs)
+        )
 
     def __str__(self):
         return super().__str__() + "\n" + self._underlying_info + "\n"
