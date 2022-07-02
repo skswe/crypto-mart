@@ -95,9 +95,9 @@ class Client:
         exchange: Exchange,
         symbol: Symbol,
         inst_type: InstrumentType,
+        starttime: TimeType,
+        endtime: TimeType,
         interval: Interval = Interval.interval_1d,
-        starttime: TimeType = None,
-        endtime: TimeType = None,
         strict: bool = False,
         cache_kwargs: dict = {},
     ) -> OHLCVFeed:
@@ -133,8 +133,8 @@ class Client:
         self,
         exchange: Exchange,
         symbol: Symbol,
-        starttime: TimeType = None,
-        endtime: TimeType = None,
+        starttime: TimeType,
+        endtime: TimeType,
         strict: bool = False,
         cache_kwargs: dict = {},
     ) -> pd.DataFrame:

@@ -25,7 +25,7 @@ class ExchangeAPIBase(ABC):
             cache_kwargs (dict, optional): Cache control settings. See pyutil.cache.cached for details. Defaults to {"disabled": False, "refresh": False}.
         """
         self.interfaces = {}
-        self.logger = logging.getLogger(f"cryptomart.{self.name}")        
+        self.logger = logging.getLogger(f"cryptomart.{self.name}")
         self.log_level = log_level
         self.logger.debug(f"Initializing {self.name}")
         self.cache_kwargs = cache_kwargs
@@ -77,9 +77,9 @@ class ExchangeAPIBase(ABC):
         self,
         symbol: Symbol,
         inst_type: InstrumentType,
+        starttime: TimeType,
+        endtime: TimeType,
         interval: Interval = Interval.interval_1d,
-        starttime: TimeType = None,
-        endtime: TimeType = None,
         strict: bool = False,
         cache_kwargs: dict = {},
     ) -> OHLCVFeed:
@@ -108,8 +108,8 @@ class ExchangeAPIBase(ABC):
     def funding_rate(
         self,
         symbol: Symbol,
-        starttime: TimeType = None,
-        endtime: TimeType = None,
+        starttime: TimeType,
+        endtime: TimeType,
         strict: bool = False,
         cache_kwargs: dict = {},
     ) -> pd.DataFrame:
