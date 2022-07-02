@@ -7,8 +7,7 @@ import os
 import numpy as np
 import pandas as pd
 
-from .enums import (FundingRateSchema, InstrumentType, Interval, OHLCVColumn,
-                    Symbol)
+from .enums import FundingRateSchema, InstrumentType, Interval, OHLCVColumn, Symbol
 from .util import parse_time
 
 logger = logging.getLogger(__name__)

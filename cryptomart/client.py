@@ -8,13 +8,12 @@ from typing import Any, Dict, List, Union
 
 import pandas as pd
 
-from cryptomart.feeds import OHLCVFeed
-from cryptomart.types import TimeType
-
 from .enums import Exchange, InstrumentType, Interval, Symbol
 from .exchanges import FTX, Binance, BitMEX, Bybit, CoinFLEX, GateIO, Kucoin, OKEx
 from .exchanges.base import ExchangeAPIBase
+from .feeds import OHLCVFeed
 from .globals import LOGGING_FORMATTER
+from .types import TimeType
 
 logger = logging.getLogger(__name__)
 

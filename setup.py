@@ -2,7 +2,7 @@ import setuptools
 
 setuptools.setup(
     name="crypto-mart",
-    version="2.0.6",
+    version="2.0.7",
     author="Stefano Katsoras",
     author_email="stefano.katsoras@gmail.com",
     license="MIT",

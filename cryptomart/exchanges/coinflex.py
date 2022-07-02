@@ -123,7 +123,7 @@ def funding_rate(
                 "marketCode": instrument_id,
                 "startTime": dt_to_timestamp(starttime, granularity="milliseconds"),
                 "endTime": dt_to_timestamp(endtime, granularity="milliseconds"),
-                "limit": limit
+                "limit": limit,
             },
         )
         reqs.append(req)
@@ -133,17 +133,24 @@ def funding_rate(
     for response in responses:
         try:
             data = pd.concat(
-                [data, FundingRateInterface.extract_response_data(response, ["data"], ["success"], True, ["message"], col_map)],
+                [
+                    data,
+                    FundingRateInterface.extract_response_data(
+                        response, ["data"], ["success"], True, ["message"], col_map
+                    ),
+                ],
                 ignore_index=True,
             )
         except MissingDataError:
             continue
     return data
 
+
 def funding_limit(timedelta: datetime.timedelta) -> int:
     TIME_LIMIT = datetime.timedelta(days=7)
     RECORD_LIMIT = 5000
     return min(RECORD_LIMIT, int(TIME_LIMIT / timedelta))
+
 
 def order_book(dispatcher: Dispatcher, url: str, instrument_id: str, depth: int = 20) -> pd.DataFrame:
     col_map = {

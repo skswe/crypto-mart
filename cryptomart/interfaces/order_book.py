@@ -1,9 +1,9 @@
 from datetime import datetime
 
 import pandas as pd
-from cryptomart.errors import MissingDataError
 
 from ..enums import Instrument, OrderBookSchema, OrderBookSide, Symbol
+from ..errors import MissingDataError
 from ..interfaces.api import APIInterface
 
 

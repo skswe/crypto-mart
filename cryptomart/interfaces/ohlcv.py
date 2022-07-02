@@ -4,11 +4,11 @@ from typing import Callable, Dict, Union
 
 import numpy as np
 import pandas as pd
-from cryptomart.feeds import OHLCVFeed
 from pyutil.cache import cached
 
 from ..enums import Instrument, Interval, OHLCVColumn, Symbol
 from ..errors import MissingDataError, NotSupportedError
+from ..feeds import OHLCVFeed
 from ..interfaces.api import APIInterface
 from ..types import IntervalType, TimeType
 from ..util import get_request_intervals, parse_time

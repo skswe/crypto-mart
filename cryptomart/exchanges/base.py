@@ -3,11 +3,11 @@ from abc import ABC, abstractmethod
 from typing import Any, Dict, Union
 
 import pandas as pd
-from cryptomart.types import TimeType
 
 from ..enums import InstrumentType, Interface, Interval, Symbol
 from ..errors import NotSupportedError
 from ..feeds import OHLCVFeed
+from ..types import TimeType
 
 logger = logging.getLogger(__name__)
 

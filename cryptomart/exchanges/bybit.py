@@ -106,9 +106,7 @@ def ohlcv_spot(
     limits: List[int],
 ) -> pd.DataFrame:
     logger = logging.getLogger("cryptomart.bybit.ohlcv.spot")
-    logger.warning(
-        f"ByBit only returns the latest 3500 datapoints for Spot OHLCV regardless of start and end times."
-    )
+    logger.warning(f"ByBit only returns the latest 3500 datapoints for Spot OHLCV regardless of start and end times.")
     col_map = {
         0: OHLCVColumn.open_time,
         1: OHLCVColumn.open,
