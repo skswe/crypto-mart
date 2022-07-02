@@ -121,9 +121,9 @@ class Client:
         return self._exchange_instance_map[exchange].ohlcv(
             symbol,
             inst_type,
-            interval=interval,
             starttime=starttime,
             endtime=endtime,
+            interval=interval,
             strict=strict,
             cache_kwargs=cache_kwargs,
         )
