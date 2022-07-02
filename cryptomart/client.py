@@ -120,6 +120,7 @@ class Client:
             OHLCVFeed: OHLCV dataframe with custom methods and properties
         """
         return self._exchange_instance_map[exchange].ohlcv(
+            symbol,
             inst_type,
             interval=interval,
             starttime=starttime,
