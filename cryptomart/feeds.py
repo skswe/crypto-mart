@@ -1,12 +1,14 @@
+from __future__ import annotations
+
 import datetime
 import logging
 import os
 
 import numpy as np
 import pandas as pd
-from pandas.core.internals import BlockManager
 
-from .enums import FundingRateSchema, InstrumentType, Interval, OHLCVColumn, Symbol
+from .enums import (FundingRateSchema, InstrumentType, Interval, OHLCVColumn,
+                    Symbol)
 from .util import parse_time
 
 logger = logging.getLogger(__name__)
@@ -37,7 +39,7 @@ class TSFeedBase(pd.DataFrame):
     # newly constructed dataframe after the resulting dataframe operation completes.
     _metadata = ["time_column", "value_column", "timedelta"]
 
-    def __init__(self, data=None, time_column=None, value_column=None, timedelta=None):
+    def __init__(self, data=None, time_column=None, value_column=None, timedelta=None, **kwargs):
         """Timeseries Feed Base - properties and methods for working with a DataFrame that represents some sort of constant time series
 
         Args:
@@ -45,7 +47,7 @@ class TSFeedBase(pd.DataFrame):
             time_column: Column that contains the time index. Defaults to None.
             value_column: Column(s) that represents the value(s). Defaults to None.
         """
-        super().__init__(data=data)
+        super().__init__(data=data, **kwargs)
 
         self.time_column = time_column
         self.value_column = value_column
@@ -112,7 +114,7 @@ class TSFeedBase(pd.DataFrame):
         return pd.DataFrame(self)
 
     @copy_metadata
-    def merge(self, *args, **kwargs):
+    def merge(self, *args, **kwargs) -> TSFeedBase:
         return super().merge(*args, **kwargs)
 
     def display(self, columns=OHLCVColumn.open, **kwargs):
@@ -144,6 +146,7 @@ class OHLCVFeed(TSFeedBase):
         timedelta: datetime.timedelta = None,
         starttime: datetime.datetime = None,
         endtime: datetime.datetime = None,
+        **kwargs,
     ):
         """Create an OHLCV Feed from a DataFrame. This class provides additional DataFrame operations and provides metadata about the feed.
 
@@ -158,7 +161,7 @@ class OHLCVFeed(TSFeedBase):
             endtime (datetime.datetime, optional): Endtime for this data. Defaults to None.
         """
         super().__init__(
-            data=data, time_column=OHLCVColumn.open_time, value_column=OHLCVColumn.open, timedelta=timedelta
+            data=data, time_column=OHLCVColumn.open_time, value_column=OHLCVColumn.open, timedelta=timedelta, **kwargs
         )
 
         self.exchange_name = exchange_name
@@ -177,7 +180,7 @@ class OHLCVFeed(TSFeedBase):
         inst_type: str = "",
         interval: str = "",
         column_map: dict = {},
-    ):
+    ) -> OHLCVFeed:
         """Create a OHLCV data feed from CSV located at `path`.
 
         Args:
@@ -242,7 +245,7 @@ class OHLCVFeed(TSFeedBase):
     @classmethod
     def from_directory(
         cls, root_path: str, exchange_name: str, symbol: str, inst_type: str, interval: str, column_map: dict = {}
-    ):
+    ) -> OHLCVFeed:
         """Use this constructor to create a feed using a directory structured by `root/exchange_name/symbol/inst_type/interval.csv`
 
         Args:
@@ -276,6 +279,7 @@ class FundingRateFeed(TSFeedBase):
         timedelta: datetime.timedelta = None,
         starttime: datetime.datetime = None,
         endtime: datetime.datetime = None,
+        **kwargs,
     ):
         """Create an Funding Rate Feed from a DataFrame. This class provides additional DataFrame operations and provides metadata about the feed.
 
@@ -292,6 +296,7 @@ class FundingRateFeed(TSFeedBase):
             time_column=FundingRateSchema.timestamp,
             value_column=FundingRateSchema.funding_rate,
             timedelta=timedelta,
+            **kwargs,
         )
 
         self.exchange_name = exchange_name
