@@ -27,8 +27,12 @@ def parse_time(time: TimeType) -> datetime.datetime:
         return time.to_pydatetime().replace(tzinfo=None, microsecond=0)
     elif isinstance(time, int) or isinstance(time, float):
         return int_to_dt(time)
-    elif isinstance(time, datetime.datetime):
-        return time.replace(tzinfo=None, microsecond=0)
+    elif isinstance(time, datetime.date):
+        try:
+            return time.replace(tzinfo=None, microsecond=0)
+        except TypeError:
+            # time is a date
+            return datetime.datetime(time.year, time.month, time.day)
     elif isinstance(time, tuple):
         return datetime.datetime(*time, tzinfo=None)
     elif isinstance(time, str):

@@ -47,9 +47,9 @@ class OHLCVInterface(APIInterface):
     def run(
         self,
         symbol: Symbol,
+        interval: Interval,
         starttime: TimeType,
         endtime: TimeType,
-        interval: Interval,
         strict: bool,
         **cache_kwargs,
     ) -> pd.DataFrame:

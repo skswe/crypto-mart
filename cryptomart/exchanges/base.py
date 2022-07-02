@@ -100,7 +100,7 @@ class ExchangeAPIBase(ABC):
         Returns:
             OHLCVFeed: OHLCV dataframe with custom methods and properties
         """
-        args = (symbol, starttime, endtime, interval, strict)
+        args = (symbol, interval, starttime, endtime, strict)
         return self._run_interface(
             Interface.OHLCV, inst_type, *args, cache_kwargs=dict(self.cache_kwargs, **cache_kwargs)
         )
