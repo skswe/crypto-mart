@@ -7,7 +7,6 @@ import time
 from typing import List
 
 import pandas as pd
-from dotenv import load_dotenv
 from requests import PreparedRequest, Request
 
 from ..enums import FundingRateSchema, Instrument, InstrumentType, Interface, Interval, OrderBookSchema
@@ -20,8 +19,6 @@ from ..interfaces.order_book import OrderBookInterface
 from ..types import IntervalType
 from ..util import Dispatcher, dt_to_timestamp
 from .base import ExchangeAPIBase
-
-load_dotenv()
 
 
 def instrument_info_perp(dispatcher: Dispatcher, url: str) -> pd.DataFrame:
