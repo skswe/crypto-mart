@@ -95,9 +95,20 @@ class FundingRateInterface(APIInterface):
                 raise MissingDataError("No data available for specified time period")
             else:
                 self.logger.warning("No data available for specified time period")
-                return pd.DataFrame(
-                    {FundingRateSchema.timestamp: pd.date_range(starttime, endtime, freq=self.funding_interval)[:-1]},
-                    columns=FundingRateSchema._values(),
+                return FundingRateFeed(
+                    pd.DataFrame(
+                        {
+                            FundingRateSchema.timestamp: pd.date_range(starttime, endtime, freq=self.funding_interval)[
+                                :-1
+                            ]
+                        },
+                        columns=FundingRateSchema._values(),
+                    ),
+                    self.exchange.name,
+                    symbol,
+                    self.funding_interval,
+                    starttime,
+                    endtime,
                 )
         data = data.sort_values(FundingRateSchema.timestamp, ascending=True)
         data[FundingRateSchema.timestamp] = data[FundingRateSchema.timestamp].apply(lambda e: parse_time(e))

@@ -107,7 +107,7 @@ class APIInterface:
                 return data_response
             else:
                 return cls.data_to_df(data_response, *args)
-        except KeyError as e:
+        except Exception as e:
             # Try to extract error message when unexpected error occurs. else just raise the error
             try:
                 err_response = response
@@ -116,7 +116,7 @@ class APIInterface:
                 if isinstance(err_response, str):
                     raise APIError(err_response)
                 raise e
-            except KeyError:
+            except:
                 raise e
 
     @classmethod

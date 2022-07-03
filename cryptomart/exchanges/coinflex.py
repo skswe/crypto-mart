@@ -6,7 +6,7 @@ import pandas as pd
 from requests import Request
 
 from ..enums import FundingRateSchema, Instrument, InstrumentType, Interface, Interval, OrderBookSchema
-from ..errors import MissingDataError
+from ..errors import APIError, MissingDataError
 from ..feeds import OHLCVColumn
 from ..interfaces.funding_rate import FundingRateInterface
 from ..interfaces.instrument_info import InstrumentInfoInterface
@@ -93,6 +93,10 @@ def ohlcv(
             )
         except MissingDataError:
             continue
+        except APIError as e:
+            if str(e) == "no result, please check your parameters":
+                # This message is returned when no data is available i.e. same as MissingDataError
+                continue
     return data
 
 
@@ -143,6 +147,10 @@ def funding_rate(
             )
         except MissingDataError:
             continue
+        except APIError as e:
+            if str(e) == "no result, please check your parameters":
+                # This message is returned when no data is available i.e. same as MissingDataError
+                continue
     return data
 
 

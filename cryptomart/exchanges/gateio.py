@@ -264,7 +264,7 @@ class GateIO(ExchangeAPIBase):
 
         spot = OHLCVInterface(
             intervals=self.intervals,
-            max_response_limit=1000,
+            max_response_limit=995,
             exchange=self,
             interface_name=Interface.OHLCV,
             inst_type=InstrumentType.SPOT,

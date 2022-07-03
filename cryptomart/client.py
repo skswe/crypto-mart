@@ -11,7 +11,7 @@ import pandas as pd
 from .enums import Exchange, InstrumentType, Interval, Symbol
 from .exchanges import FTX, Binance, BitMEX, Bybit, CoinFLEX, GateIO, Kucoin, OKEx
 from .exchanges.base import ExchangeAPIBase
-from .feeds import OHLCVFeed
+from .feeds import FundingRateFeed, OHLCVFeed
 from .globals import LOGGING_FORMATTER
 from .types import TimeType
 
@@ -136,7 +136,7 @@ class Client:
         endtime: TimeType,
         strict: bool = False,
         cache_kwargs: dict = {},
-    ) -> pd.DataFrame:
+    ) -> FundingRateFeed:
         """Run main interface function
 
         Args:

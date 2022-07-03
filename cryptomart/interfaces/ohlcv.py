@@ -93,9 +93,18 @@ class OHLCVInterface(APIInterface):
                 raise MissingDataError("No data available for specified time period")
             else:
                 self.logger.warning("No data available for specified time period")
-                return pd.DataFrame(
-                    {OHLCVColumn.open_time: pd.date_range(starttime, endtime, freq=timedelta)[:-1]},
-                    columns=OHLCVColumn._values(),
+                return OHLCVFeed(
+                    pd.DataFrame(
+                        {OHLCVColumn.open_time: pd.date_range(starttime, endtime, freq=timedelta)[:-1]},
+                        columns=OHLCVColumn._values(),
+                    ),
+                    self.exchange.name,
+                    symbol,
+                    self.inst_type,
+                    interval,
+                    timedelta,
+                    starttime,
+                    endtime,
                 )
         data = data.sort_values(OHLCVColumn.open_time, ascending=True)
 

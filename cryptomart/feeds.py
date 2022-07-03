@@ -63,17 +63,17 @@ class TSFeedBase(pd.DataFrame):
     # Utility methods
     @property
     def earliest_time(self):
-        if self.empty:
+        try:
+            return self[~self[self.value_column].isna()].iloc[0][self.time_column]
+        except IndexError:
             return None
-
-        return self[~self[self.value_column].isna()].iloc[0][self.time_column]
 
     @property
     def latest_time(self):
-        if self.empty:
+        try:
+            return self[~self[self.value_column].isna()].iloc[-1][self.time_column]
+        except IndexError:
             return None
-
-        return self[~self[self.value_column].isna()].iloc[-1][self.time_column]
 
     @property
     def missing_indices(self):
@@ -103,6 +103,14 @@ class TSFeedBase(pd.DataFrame):
             .pipe(lambda series: series[series > self.timedelta])
             .count()
         )
+
+    @property
+    def values_only(self):
+        return self[np.setdiff1d(self.columns, self.time_column)]
+
+    @property
+    def time_only(self):
+        return self[self.time_column]
 
     @property
     def _underlying_info(self):

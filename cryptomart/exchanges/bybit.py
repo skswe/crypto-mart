@@ -179,6 +179,8 @@ def funding_rate(
         )
 
     first_res = make_request(1)
+    if len(first_res["data"]) == 0:
+        return pd.DataFrame()
     current_page = 1
     last_page = first_res["last_page"]
     data = pd.DataFrame(first_res["data"]).rename(columns=col_map)[col_map.values()]
