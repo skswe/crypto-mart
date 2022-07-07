@@ -103,6 +103,8 @@ def ohlcv_perp(
                 # This is due to Kucoin's global cloudfare limit being exceeded: https://github.com/ccxt/ccxt/issues/10273
                 dispatcher.logger.debug("Retrying...")
                 pass
+            else:
+                raise e
 
     return data
 
@@ -162,6 +164,8 @@ def ohlcv_spot(
                 # This is due to Kucoin's global cloudfare limit being exceeded: https://github.com/ccxt/ccxt/issues/10273
                 dispatcher.logger.debug("Retrying...")
                 pass
+            else:
+                raise e
     return data
 
 
@@ -215,6 +219,8 @@ def funding_rate(
                 # This is due to Kucoin's global cloudfare limit being exceeded: https://github.com/ccxt/ccxt/issues/10273
                 dispatcher.logger.debug("Retrying...")
                 pass
+            else:
+                raise e
     return data
 
 
@@ -269,6 +275,8 @@ def funding_rate_internal(
                 # This is due to Kucoin's global cloudfare limit being exceeded: https://github.com/ccxt/ccxt/issues/10273
                 dispatcher.logger.debug("Retrying...")
                 pass
+            else:
+                raise e
     return data
 
 
@@ -408,7 +416,7 @@ class Kucoin(ExchangeAPIBase):
     def init_ohlcv_interface(self):
         perpetual = OHLCVInterface(
             intervals=self.perpetual_intervals,
-            max_response_limit=1500,
+            max_response_limit=200,
             exchange=self,
             interface_name=Interface.OHLCV,
             inst_type=InstrumentType.PERPETUAL,
@@ -419,7 +427,7 @@ class Kucoin(ExchangeAPIBase):
 
         spot = OHLCVInterface(
             intervals=self.spot_intervals,
-            max_response_limit=1000,
+            max_response_limit=1500,
             exchange=self,
             interface_name=Interface.OHLCV,
             inst_type=InstrumentType.SPOT,
