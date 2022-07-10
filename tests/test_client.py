@@ -6,12 +6,12 @@ from cryptomart.client import Client
 from cryptomart.enums import Exchange, Instrument, InstrumentType, Interval, OrderBookSchema, OrderBookSide, Symbol
 from cryptomart.exchanges.base import ExchangeAPIBase, NotSupportedError
 
-PRINT = True
+PRINT = False
 LOG_LEVEL = "DEBUG"
 CACHE_KWARGS = {"disabled": True}
-# WHITELIST = set(Exchange._values())
+WHITELIST = set(Exchange._values())
 # BLACKLIST = set(Exchange._values())
-WHITELIST = set({Exchange.KUCOIN})
+# WHITELIST = set({Exchange.KUCOIN})
 BLACKLIST = set({})
 EXCHANGES = WHITELIST - BLACKLIST
 
@@ -50,7 +50,7 @@ def test_ohlcv(
     endtime: datetime,
 ):
     try:
-        df = exchange.ohlcv(symbol, inst_type, interval, starttime, endtime)
+        df = exchange.ohlcv(symbol, inst_type, starttime, endtime, interval)
         timedelta = exchange._get_interface("ohlcv", inst_type).intervals[interval][1]
         assert df.open_time.iloc[0] == starttime
         assert df.open_time.iloc[-1] == endtime - timedelta
@@ -67,7 +67,7 @@ def test_ohlcv(
 @pytest.mark.requires_http
 def test_orderbook(exchange: ExchangeAPIBase, symbol: Symbol, inst_type: InstrumentType, depth: int):
     orderbook = exchange.order_book(symbol, inst_type, depth)
-    assert (orderbook.columns == OrderBookSchema._names()).all()
+    assert (sorted(orderbook.columns) == sorted(OrderBookSchema._names()))
 
     bids = orderbook[orderbook[OrderBookSchema.side] == OrderBookSide.bid].reset_index(drop=True)
     asks = orderbook[orderbook[OrderBookSchema.side] == OrderBookSide.ask].reset_index(drop=True)
