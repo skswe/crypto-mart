@@ -124,6 +124,10 @@ class TSFeedBase(pd.DataFrame):
     def merge(self, *args, **kwargs) -> TSFeedBase:
         return super().merge(*args, **kwargs)
 
+    @copy_metadata
+    def join(self, *args, **kwargs) -> TSFeedBase:
+        return super().join(*args, **kwargs)
+
     def plot(self, *args, **kwargs):
         return (
             pd.DataFrame(self.set_index(self.time_column)).dropna().plot(*args, title=self._underlying_info, **kwargs)
@@ -273,6 +277,13 @@ class OHLCVFeed(TSFeedBase):
     @property
     def _underlying_info(self):
         return f"ohlcv.{self.exchange_name}.{self.inst_type}.{self.symbol}"
+
+    def returns(self, column=OHLCVColumn.close):
+        return (
+            (((self[column] - self[column].shift(1)) / self[column].shift(1)) * 100)
+            .rename("returns")
+            .set_axis(self[self.time_column])
+        )
 
 
 class FundingRateFeed(TSFeedBase):
