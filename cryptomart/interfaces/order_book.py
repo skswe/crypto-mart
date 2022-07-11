@@ -10,11 +10,16 @@ from ..interfaces.api import APIInterface
 class OrderBookInterface(APIInterface):
     def __init__(
         self,
+        refresh_instruments: bool,
         **api_interface_kwargs,
     ):
         super().__init__(**api_interface_kwargs)
-        self.instruments = self.exchange.instrument_info(self.inst_type, map_column=Instrument.exchange_symbol)
-        self.multipliers = self.exchange.instrument_info(self.inst_type, map_column=Instrument.orderbook_multi)
+        self.instruments = self.exchange.instrument_info(
+            self.inst_type, map_column=Instrument.exchange_symbol, cache_kwargs={"refresh": refresh_instruments}
+        )
+        self.multipliers = self.exchange.instrument_info(
+            self.inst_type, map_column=Instrument.orderbook_multi, cache_kwargs={"refresh": refresh_instruments}
+        )
 
     def run(self, symbol: Symbol, depth: int, **cache_kwargs) -> pd.DataFrame:
         """Run main interface function

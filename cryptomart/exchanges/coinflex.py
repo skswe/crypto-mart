@@ -195,13 +195,18 @@ class CoinFLEX(ExchangeAPIBase):
         Interval.interval_1d: ("86400s", datetime.timedelta(days=1)),
     }
 
-    def __init__(self, cache_kwargs={"disabled": False, "refresh": False}, log_level: str = "INFO"):
+    def __init__(
+        self,
+        cache_kwargs={"disabled": False, "refresh": False},
+        log_level: str = "INFO",
+        refresh_instruments: bool = False,
+    ):
         super().__init__(cache_kwargs=cache_kwargs, log_level=log_level)
         self.init_dispatchers()
         self.init_instrument_info_interface()
-        self.init_ohlcv_interface()
-        self.init_funding_rate_interface()
-        self.init_order_book_interface()
+        self.init_ohlcv_interface(refresh_instruments)
+        self.init_funding_rate_interface(refresh_instruments)
+        self.init_order_book_interface(refresh_instruments)
 
     def init_dispatchers(self):
         self.logger.debug("initializing dispatchers")
@@ -231,8 +236,9 @@ class CoinFLEX(ExchangeAPIBase):
             InstrumentType.SPOT: spot,
         }
 
-    def init_ohlcv_interface(self):
+    def init_ohlcv_interface(self, refresh_instruments):
         perpetual = OHLCVInterface(
+            refresh_instruments,
             intervals=self.intervals,
             max_response_limit=ohlcv_limit,
             exchange=self,
@@ -244,6 +250,7 @@ class CoinFLEX(ExchangeAPIBase):
         )
 
         spot = OHLCVInterface(
+            refresh_instruments,
             intervals=self.intervals,
             max_response_limit=ohlcv_limit,
             exchange=self,
@@ -259,8 +266,9 @@ class CoinFLEX(ExchangeAPIBase):
             InstrumentType.SPOT: spot,
         }
 
-    def init_funding_rate_interface(self):
+    def init_funding_rate_interface(self, refresh_instruments):
         perpetual = FundingRateInterface(
+            refresh_instruments,
             max_response_limit=funding_limit,
             funding_interval=datetime.timedelta(hours=1),
             exchange=self,
@@ -273,8 +281,9 @@ class CoinFLEX(ExchangeAPIBase):
 
         self.interfaces[Interface.FUNDING_RATE] = {InstrumentType.PERPETUAL: perpetual}
 
-    def init_order_book_interface(self):
+    def init_order_book_interface(self, refresh_instruments):
         perpetual = OrderBookInterface(
+            refresh_instruments,
             exchange=self,
             interface_name=Interface.ORDER_BOOK,
             inst_type=InstrumentType.PERPETUAL,
@@ -284,6 +293,7 @@ class CoinFLEX(ExchangeAPIBase):
         )
 
         spot = OrderBookInterface(
+            refresh_instruments,
             exchange=self,
             interface_name=Interface.ORDER_BOOK,
             inst_type=InstrumentType.SPOT,

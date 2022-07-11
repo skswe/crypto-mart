@@ -19,6 +19,7 @@ class OHLCVInterface(APIInterface):
 
     def __init__(
         self,
+        refresh_instruments: bool,
         intervals: Dict[Interval, IntervalType],
         max_response_limit: Union[int, Callable[[datetime.timedelta], int]],
         valid_data_threshold: float = 1,
@@ -27,13 +28,16 @@ class OHLCVInterface(APIInterface):
         """Initialize the interface
 
         Args:
+            refresh_instruments (bool): If True, refreshes the instrument cache
             intervals (Dict[Interval, IntervalType]): Mapping of `Interval` enum to API interval ID for the interface
             max_response_limit (int): Max number of rows that can be returned in one request to the API
             valid_data_threshold (float, optional): Percentage of data that must be present in the response. Depending on the
                 value of `strict` in the function call, either a warning will be logged or an exception will be raised. Defaults to 1.
         """
         super().__init__(**api_interface_kwargs)
-        self.instruments = self.exchange.instrument_info(self.inst_type, map_column=Instrument.exchange_symbol)
+        self.instruments = self.exchange.instrument_info(
+            self.inst_type, map_column=Instrument.exchange_symbol, cache_kwargs={"refresh": refresh_instruments}
+        )
         self.intervals = intervals
         self.max_response_limit = max_response_limit
         self.valid_data_threshold = valid_data_threshold

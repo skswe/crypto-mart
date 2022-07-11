@@ -18,7 +18,12 @@ class ExchangeAPIBase(ABC):
     def name() -> str:
         pass
 
-    def __init__(self, cache_kwargs: dict = {"disabled": False, "refresh": False}, log_level: str = "INFO"):
+    def __init__(
+        self,
+        cache_kwargs: dict = {"disabled": False, "refresh": False},
+        log_level: str = "INFO",
+        refresh_instruments=False,
+    ):
         """Init the exchange
 
         Args:
@@ -29,6 +34,7 @@ class ExchangeAPIBase(ABC):
         self.log_level = log_level
         self.logger.debug(f"Initializing {self.name}")
         self.cache_kwargs = cache_kwargs
+        self.refresh_instruments = refresh_instruments
 
     @property
     def log_level(self):

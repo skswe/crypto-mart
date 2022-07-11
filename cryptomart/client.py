@@ -25,9 +25,10 @@ class Client:
         self,
         exchanges: List[Exchange] = Exchange._names(),
         cache_kwargs: dict = {"disabled": False, "refresh": False},
-        log_level="INFO",
-        log_file=None,
-        quiet=False,
+        log_level: str = "INFO",
+        log_file: str = None,
+        quiet: bool = False,
+        refresh_instruments: bool = False,
         **kwargs,
     ):
         """Unified interface to all registered Exchanges.
@@ -38,6 +39,7 @@ class Client:
             log_file (str, optional): file to save logs to. Defaults to None.
             exchange_init_kwargs: kwargs to pass to creation of each exchange object in `exchanges`
             quiet: If True, hides initialization logs.
+            refresh_instruments (bool): If True, refreshes the instrument cache
         """
         if quiet:
             # Disables all logs at INFO or below
@@ -64,7 +66,7 @@ class Client:
         self._active_exchanges = [getattr(Exchange, e) for e in exchanges]
         self._exchange_instance_map: Dict[Exchange, ExchangeAPIBase] = {}
         self._exchange_class_map = {}
-        self._load_exchanges(cache_kwargs=cache_kwargs, log_level=log_level)
+        self._load_exchanges(cache_kwargs=cache_kwargs, log_level=log_level, refresh_instruments=refresh_instruments)
         logger.info("Client initialized")
         logger.info("=" * 80)
 
@@ -216,7 +218,7 @@ class Client:
         def _init_exchange_thread(exchange_name: str, exchange_cls: ExchangeAPIBase, exchange_kwargs: dict):
             self._exchange_instance_map[exchange_name] = exchange_cls(**exchange_kwargs)
 
-        # Map each instantiation to its own thread to minimuze http request blocking
+        # Map each instantiation to its own thread to minimize http request blocking
         with ThreadPoolExecutor(max_workers=len(self._active_exchanges)) as executor:
             errors = executor.map(
                 _init_exchange_thread,
