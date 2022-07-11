@@ -1,7 +1,6 @@
 # crypto-mart - crypto exchange data for rapid algotrading development
 
 ## Overview
-
 The main goal of this module is to provide a unified API for accessing data
 across various crypto exchanges. This module provides an interface to access the
 following types of data:
@@ -12,13 +11,9 @@ following types of data:
 - **Order Book Snapshots (Spot / Perpetual markets)**
 
 ## Installation
-
-`git clone https://github.com/senderr/crypto-mart.git`
-
-Requires pandas>=1.4.2, numpy>=1.22.4
+`pip install git+ssh://git@github.com/senderr/crypto-mart.git`
 
 # A note on caching
-
 All interfaces (except orderbook) will automatically cache the result to disk.
 This design decision is enabled by default because algotrading development is an
 iterative process, and running the same HTTP requests over and over while
@@ -28,7 +23,6 @@ This behaviour can be disabled by passing the keyword argument
 `cache_kwargs={"disabled": True}`
 
 Example:
-
 ```
 import cryptomart as cm
 client = cm.Client()
@@ -45,7 +39,6 @@ For more details on how to use / customize caching, see:
 https://github.com/senderr/pyutil/blob/master/pyutil/cache.py
 
 # Using the API
-
 Create a `Client` object which contains the main interface for this module
 
 ```
@@ -71,7 +64,6 @@ The following exchanges are currently supported by the cryptomart API:
 - okex
 
 ## OHLCV Historical Data
-
 ```
 import cryptomart as cm
 
@@ -87,7 +79,6 @@ client.binance.ohlcv(symbol, inst_type, starttime, endtime, interval)
 ```
 
 Out:
-
 ```
      open_time      open      high       low     close      volume
 0   2021-07-15  32803.00  33170.00  31140.00  31866.43  539111.667
@@ -106,7 +97,6 @@ Out:
 ```
 
 ## Instrument Info
-
 ```
 import cryptomart as cm
 
@@ -116,7 +106,6 @@ client.kucoin.instrument_info("spot")
 ```
 
 Out:
-
 ```
          symbol       name baseCurrency quoteCurrency feeCurrency market baseMinSize  ...  minFunds isMarginEnabled enableTrading cryptomart_symbol exchange_symbol exchange_list_time orderbook_multi
 0       REQ-ETH    REQ-ETH          REQ           ETH         ETH   ALTS           1  ...   0.00001           False          True               REQ         REQ-ETH                NaN             1.0
@@ -135,7 +124,6 @@ Out:
 ```
 
 ## Order Book Snapshot
-
 ```
 import cryptomart as cm
 
@@ -149,7 +137,6 @@ client.binance.order_book(symbol, inst_type, depth)
 ```
 
 Out:
-
 ```
       price  quantity side           timestamp
 0   38595.9     7.058    b 2022-05-01 23:28:03
@@ -195,7 +182,6 @@ Out:
 ```
 
 ## Historical Funding Rate
-
 ```
 import cryptomart as cm
 
@@ -209,7 +195,6 @@ client.binance.funding_rate(symbol, starttime, endtime, cache_kwargs={"disabled"
 ```
 
 Out:
-
 ```
               timestamp  funding_rate
 0   2021-07-15 00:00:00     -0.000049
