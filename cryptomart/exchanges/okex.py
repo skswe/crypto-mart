@@ -186,16 +186,16 @@ class OKEx(ExchangeAPIBase):
     ):
         super().__init__(cache_kwargs=cache_kwargs, log_level=log_level)
         self.init_dispatchers()
-        self.init_instrument_info_interface()
-        self.init_ohlcv_interface(refresh_instruments)
-        self.init_funding_rate_interface(refresh_instruments)
-        self.init_order_book_interface(refresh_instruments)
+        self.init_instrument_info_interface(refresh_instruments)
+        self.init_ohlcv_interface()
+        self.init_funding_rate_interface()
+        self.init_order_book_interface()
 
     def init_dispatchers(self):
         self.logger.debug("initializing dispatchers")
         self.dispatcher = Dispatcher(f"{self.name}.dispatcher.perpetual", timeout=1 / 5)
 
-    def init_instrument_info_interface(self):
+    def init_instrument_info_interface(self, refresh):
         perpetual = InstrumentInfoInterface(
             exchange=self,
             interface_name=Interface.INSTRUMENT_INFO,
@@ -214,14 +214,25 @@ class OKEx(ExchangeAPIBase):
             execute=instrument_info_spot,
         )
 
+        self.perpetual_instruments = perpetual.run(
+            map_column=Instrument.exchange_symbol, cache_kwargs={"refresh": refresh}
+        )
+        self.spot_instruments = spot.run(map_column=Instrument.exchange_symbol, cache_kwargs={"refresh": refresh})
+        self.perpetual_order_book_multis = perpetual.run(
+            map_column=Instrument.orderbook_multi, cache_kwargs={"refresh": refresh}
+        )
+        self.spot_order_book_multis = spot.run(
+            map_column=Instrument.orderbook_multi, cache_kwargs={"refresh": refresh}
+        )
+
         self.interfaces[Interface.INSTRUMENT_INFO] = {
             InstrumentType.PERPETUAL: perpetual,
             InstrumentType.SPOT: spot,
         }
 
-    def init_ohlcv_interface(self, refresh_instruments):
+    def init_ohlcv_interface(self):
         perpetual = OHLCVInterface(
-            refresh_instruments,
+            instruments=self.perpetual_instruments,
             intervals=self.intervals,
             max_response_limit=100,
             exchange=self,
@@ -233,7 +244,7 @@ class OKEx(ExchangeAPIBase):
         )
 
         spot = OHLCVInterface(
-            refresh_instruments,
+            instruments=self.spot_instruments,
             intervals=self.intervals,
             max_response_limit=100,
             exchange=self,
@@ -249,9 +260,9 @@ class OKEx(ExchangeAPIBase):
             InstrumentType.SPOT: spot,
         }
 
-    def init_funding_rate_interface(self, refresh_instruments):
+    def init_funding_rate_interface(self):
         perpetual = FundingRateInterface(
-            refresh_instruments,
+            instruments=self.perpetual_instruments,
             max_response_limit=100,
             exchange=self,
             interface_name=Interface.FUNDING_RATE,
@@ -263,9 +274,10 @@ class OKEx(ExchangeAPIBase):
 
         self.interfaces[Interface.FUNDING_RATE] = {InstrumentType.PERPETUAL: perpetual}
 
-    def init_order_book_interface(self, refresh_instruments):
+    def init_order_book_interface(self):
         perpetual = OrderBookInterface(
-            refresh_instruments,
+            instruments=self.perpetual_instruments,
+            multipliers=self.perpetual_order_book_multis,
             exchange=self,
             interface_name=Interface.ORDER_BOOK,
             inst_type=InstrumentType.PERPETUAL,
@@ -275,7 +287,8 @@ class OKEx(ExchangeAPIBase):
         )
 
         spot = OrderBookInterface(
-            refresh_instruments,
+            instruments=self.spot_instruments,
+            multipliers=self.spot_order_book_multis,
             exchange=self,
             interface_name=Interface.ORDER_BOOK,
             inst_type=InstrumentType.SPOT,
