@@ -461,7 +461,7 @@ class Kucoin(ExchangeAPIBase):
 
     def init_funding_rate_interface(self):
         perpetual = FundingRateInterface(
-            instruments=self.perpetual_dispatcher,
+            instruments=self.perpetual_instruments,
             max_response_limit=100,
             exchange=self,
             interface_name=Interface.FUNDING_RATE,
