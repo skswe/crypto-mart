@@ -4,11 +4,11 @@ from typing import Callable, Dict, Union
 
 import numpy as np
 import pandas as pd
-from cryptomart.feeds import OHLCVFeed
 from pyutil.cache import cached
 
 from ..enums import Instrument, Interval, OHLCVColumn, Symbol
 from ..errors import MissingDataError, NotSupportedError
+from ..feeds import OHLCVFeed
 from ..interfaces.api import APIInterface
 from ..types import IntervalType, TimeType
 from ..util import get_request_intervals, parse_time
@@ -19,6 +19,7 @@ class OHLCVInterface(APIInterface):
 
     def __init__(
         self,
+        instruments: Dict[Symbol, str],
         intervals: Dict[Interval, IntervalType],
         max_response_limit: Union[int, Callable[[datetime.timedelta], int]],
         valid_data_threshold: float = 1,
@@ -27,13 +28,14 @@ class OHLCVInterface(APIInterface):
         """Initialize the interface
 
         Args:
+            refresh_instruments (bool): If True, refreshes the instrument cache
             intervals (Dict[Interval, IntervalType]): Mapping of `Interval` enum to API interval ID for the interface
             max_response_limit (int): Max number of rows that can be returned in one request to the API
             valid_data_threshold (float, optional): Percentage of data that must be present in the response. Depending on the
                 value of `strict` in the function call, either a warning will be logged or an exception will be raised. Defaults to 1.
         """
         super().__init__(**api_interface_kwargs)
-        self.instruments = self.exchange.instrument_info(self.inst_type, map_column=Instrument.exchange_symbol)
+        self.instruments = instruments
         self.intervals = intervals
         self.max_response_limit = max_response_limit
         self.valid_data_threshold = valid_data_threshold
@@ -93,9 +95,18 @@ class OHLCVInterface(APIInterface):
                 raise MissingDataError("No data available for specified time period")
             else:
                 self.logger.warning("No data available for specified time period")
-                return pd.DataFrame(
-                    {OHLCVColumn.open_time: pd.date_range(starttime, endtime, freq=timedelta)[:-1]},
-                    columns=OHLCVColumn._values(),
+                return OHLCVFeed(
+                    pd.DataFrame(
+                        {OHLCVColumn.open_time: pd.date_range(starttime, endtime, freq=timedelta)[:-1]},
+                        columns=OHLCVColumn._values(),
+                    ),
+                    self.exchange.name,
+                    symbol,
+                    self.inst_type,
+                    interval,
+                    timedelta,
+                    starttime,
+                    endtime,
                 )
         data = data.sort_values(OHLCVColumn.open_time, ascending=True)
 

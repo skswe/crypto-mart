@@ -2,11 +2,11 @@ import logging
 from typing import Any, Callable, Dict, List, Union
 
 import pandas as pd
-from cryptomart.errors import APIError, MissingDataError
-from cryptomart.exchanges.base import ExchangeAPIBase
-from cryptomart.types import JSONDataType
 
 from ..enums import InstrumentType, Interface
+from ..errors import APIError, MissingDataError
+from ..exchanges.base import ExchangeAPIBase
+from ..types import JSONDataType
 from ..util import Dispatcher
 
 
@@ -64,7 +64,7 @@ class APIInterface:
         expected_code: Union[str, int, None],
         err_msg_attrs: List[str],
         *args,
-        raw: bool=False,
+        raw: bool = False,
     ) -> Any:
         """Check JSON response object for errors and return data portion of response or error message.
 
@@ -107,7 +107,7 @@ class APIInterface:
                 return data_response
             else:
                 return cls.data_to_df(data_response, *args)
-        except KeyError as e:
+        except Exception as e:
             # Try to extract error message when unexpected error occurs. else just raise the error
             try:
                 err_response = response
@@ -116,7 +116,7 @@ class APIInterface:
                 if isinstance(err_response, str):
                     raise APIError(err_response)
                 raise e
-            except KeyError:
+            except:
                 raise e
 
     @classmethod

@@ -6,7 +6,7 @@ import pandas as pd
 from requests import Request
 
 from ..enums import FundingRateSchema, Instrument, InstrumentType, Interface, Interval, OrderBookSchema
-from ..errors import MissingDataError
+from ..errors import APIError, MissingDataError
 from ..feeds import OHLCVColumn
 from ..interfaces.funding_rate import FundingRateInterface
 from ..interfaces.instrument_info import InstrumentInfoInterface
@@ -93,6 +93,10 @@ def ohlcv(
             )
         except MissingDataError:
             continue
+        except APIError as e:
+            if str(e) == "no result, please check your parameters":
+                # This message is returned when no data is available i.e. same as MissingDataError
+                continue
     return data
 
 
@@ -123,7 +127,7 @@ def funding_rate(
                 "marketCode": instrument_id,
                 "startTime": dt_to_timestamp(starttime, granularity="milliseconds"),
                 "endTime": dt_to_timestamp(endtime, granularity="milliseconds"),
-                "limit": limit
+                "limit": limit,
             },
         )
         reqs.append(req)
@@ -133,17 +137,28 @@ def funding_rate(
     for response in responses:
         try:
             data = pd.concat(
-                [data, FundingRateInterface.extract_response_data(response, ["data"], ["success"], True, ["message"], col_map)],
+                [
+                    data,
+                    FundingRateInterface.extract_response_data(
+                        response, ["data"], ["success"], True, ["message"], col_map
+                    ),
+                ],
                 ignore_index=True,
             )
         except MissingDataError:
             continue
+        except APIError as e:
+            if str(e) == "no result, please check your parameters":
+                # This message is returned when no data is available i.e. same as MissingDataError
+                continue
     return data
+
 
 def funding_limit(timedelta: datetime.timedelta) -> int:
     TIME_LIMIT = datetime.timedelta(days=7)
     RECORD_LIMIT = 5000
     return min(RECORD_LIMIT, int(TIME_LIMIT / timedelta))
+
 
 def order_book(dispatcher: Dispatcher, url: str, instrument_id: str, depth: int = 20) -> pd.DataFrame:
     col_map = {
@@ -180,10 +195,15 @@ class CoinFLEX(ExchangeAPIBase):
         Interval.interval_1d: ("86400s", datetime.timedelta(days=1)),
     }
 
-    def __init__(self, cache_kwargs={"disabled": False, "refresh": False}, log_level: str = "INFO"):
+    def __init__(
+        self,
+        cache_kwargs={"disabled": False, "refresh": False},
+        log_level: str = "INFO",
+        refresh_instruments: bool = False,
+    ):
         super().__init__(cache_kwargs=cache_kwargs, log_level=log_level)
         self.init_dispatchers()
-        self.init_instrument_info_interface()
+        self.init_instrument_info_interface(refresh_instruments)
         self.init_ohlcv_interface()
         self.init_funding_rate_interface()
         self.init_order_book_interface()
@@ -192,7 +212,7 @@ class CoinFLEX(ExchangeAPIBase):
         self.logger.debug("initializing dispatchers")
         self.dispatcher = Dispatcher(f"{self.name}.dispatcher.perpetual", timeout=1 / 6)
 
-    def init_instrument_info_interface(self):
+    def init_instrument_info_interface(self, refresh):
         perpetual = InstrumentInfoInterface(
             exchange=self,
             interface_name=Interface.INSTRUMENT_INFO,
@@ -211,6 +231,17 @@ class CoinFLEX(ExchangeAPIBase):
             execute=instrument_info_spot,
         )
 
+        self.perpetual_instruments = perpetual.run(
+            map_column=Instrument.exchange_symbol, cache_kwargs={"refresh": refresh}
+        )
+        self.spot_instruments = spot.run(map_column=Instrument.exchange_symbol, cache_kwargs={"refresh": refresh})
+        self.perpetual_order_book_multis = perpetual.run(
+            map_column=Instrument.orderbook_multi, cache_kwargs={"refresh": refresh}
+        )
+        self.spot_order_book_multis = spot.run(
+            map_column=Instrument.orderbook_multi, cache_kwargs={"refresh": refresh}
+        )
+
         self.interfaces[Interface.INSTRUMENT_INFO] = {
             InstrumentType.PERPETUAL: perpetual,
             InstrumentType.SPOT: spot,
@@ -218,6 +249,7 @@ class CoinFLEX(ExchangeAPIBase):
 
     def init_ohlcv_interface(self):
         perpetual = OHLCVInterface(
+            instruments=self.perpetual_instruments,
             intervals=self.intervals,
             max_response_limit=ohlcv_limit,
             exchange=self,
@@ -229,6 +261,7 @@ class CoinFLEX(ExchangeAPIBase):
         )
 
         spot = OHLCVInterface(
+            instruments=self.spot_instruments,
             intervals=self.intervals,
             max_response_limit=ohlcv_limit,
             exchange=self,
@@ -246,6 +279,7 @@ class CoinFLEX(ExchangeAPIBase):
 
     def init_funding_rate_interface(self):
         perpetual = FundingRateInterface(
+            instruments=self.perpetual_instruments,
             max_response_limit=funding_limit,
             funding_interval=datetime.timedelta(hours=1),
             exchange=self,
@@ -260,6 +294,8 @@ class CoinFLEX(ExchangeAPIBase):
 
     def init_order_book_interface(self):
         perpetual = OrderBookInterface(
+            instruments=self.perpetual_instruments,
+            multipliers=self.perpetual_order_book_multis,
             exchange=self,
             interface_name=Interface.ORDER_BOOK,
             inst_type=InstrumentType.PERPETUAL,
@@ -269,6 +305,8 @@ class CoinFLEX(ExchangeAPIBase):
         )
 
         spot = OrderBookInterface(
+            instruments=self.spot_instruments,
+            multipliers=self.spot_order_book_multis,
             exchange=self,
             interface_name=Interface.ORDER_BOOK,
             inst_type=InstrumentType.SPOT,

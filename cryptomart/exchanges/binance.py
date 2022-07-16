@@ -167,10 +167,15 @@ class Binance(ExchangeAPIBase):
         Interval.interval_1w: ("1w", datetime.timedelta(weeks=1)),
     }
 
-    def __init__(self, cache_kwargs={"disabled": False, "refresh": False}, log_level: str = "INFO"):
+    def __init__(
+        self,
+        cache_kwargs={"disabled": False, "refresh": False},
+        log_level: str = "INFO",
+        refresh_instruments: bool = False,
+    ):
         super().__init__(cache_kwargs=cache_kwargs, log_level=log_level)
         self.init_dispatchers()
-        self.init_instrument_info_interface()
+        self.init_instrument_info_interface(refresh_instruments)
         self.init_ohlcv_interface()
         self.init_funding_rate_interface()
         self.init_order_book_interface()
@@ -180,7 +185,7 @@ class Binance(ExchangeAPIBase):
         self.perpetual_dispatcher = Dispatcher(f"{self.name}.dispatcher.perpetual", timeout=1 / 4)
         self.spot_dispatcher = Dispatcher(f"{self.name}.dispatcher.spot", timeout=1 / 2)
 
-    def init_instrument_info_interface(self):
+    def init_instrument_info_interface(self, refresh):
         perpetual = InstrumentInfoInterface(
             exchange=self,
             interface_name=Interface.INSTRUMENT_INFO,
@@ -199,6 +204,17 @@ class Binance(ExchangeAPIBase):
             execute=instrument_info_spot,
         )
 
+        self.perpetual_instruments = perpetual.run(
+            map_column=Instrument.exchange_symbol, cache_kwargs={"refresh": refresh}
+        )
+        self.spot_instruments = spot.run(map_column=Instrument.exchange_symbol, cache_kwargs={"refresh": refresh})
+        self.perpetual_order_book_multis = perpetual.run(
+            map_column=Instrument.orderbook_multi, cache_kwargs={"refresh": refresh}
+        )
+        self.spot_order_book_multis = spot.run(
+            map_column=Instrument.orderbook_multi, cache_kwargs={"refresh": refresh}
+        )
+
         self.interfaces[Interface.INSTRUMENT_INFO] = {
             InstrumentType.PERPETUAL: perpetual,
             InstrumentType.SPOT: spot,
@@ -206,6 +222,7 @@ class Binance(ExchangeAPIBase):
 
     def init_ohlcv_interface(self):
         perpetual = OHLCVInterface(
+            instruments=self.perpetual_instruments,
             intervals=self.intervals,
             max_response_limit=1500,
             exchange=self,
@@ -217,6 +234,7 @@ class Binance(ExchangeAPIBase):
         )
 
         spot = OHLCVInterface(
+            instruments=self.spot_instruments,
             intervals=self.intervals,
             max_response_limit=1000,
             exchange=self,
@@ -234,6 +252,7 @@ class Binance(ExchangeAPIBase):
 
     def init_funding_rate_interface(self):
         perpetual = FundingRateInterface(
+            instruments=self.perpetual_instruments,
             max_response_limit=1000,
             exchange=self,
             interface_name=Interface.FUNDING_RATE,
@@ -247,6 +266,8 @@ class Binance(ExchangeAPIBase):
 
     def init_order_book_interface(self):
         perpetual = OrderBookInterface(
+            instruments=self.perpetual_instruments,
+            multipliers=self.perpetual_order_book_multis,
             exchange=self,
             interface_name=Interface.ORDER_BOOK,
             inst_type=InstrumentType.PERPETUAL,
@@ -256,6 +277,8 @@ class Binance(ExchangeAPIBase):
         )
 
         spot = OrderBookInterface(
+            instruments=self.spot_instruments,
+            multipliers=self.spot_order_book_multis,
             exchange=self,
             interface_name=Interface.ORDER_BOOK,
             inst_type=InstrumentType.SPOT,

@@ -7,11 +7,10 @@ import time
 from typing import List
 
 import pandas as pd
-from dotenv import load_dotenv
 from requests import PreparedRequest, Request
 
 from ..enums import FundingRateSchema, Instrument, InstrumentType, Interface, Interval, OrderBookSchema
-from ..errors import MissingDataError
+from ..errors import APIError, MissingDataError
 from ..feeds import OHLCVColumn
 from ..interfaces.funding_rate import FundingRateInterface
 from ..interfaces.instrument_info import InstrumentInfoInterface
@@ -20,8 +19,6 @@ from ..interfaces.order_book import OrderBookInterface
 from ..types import IntervalType
 from ..util import Dispatcher, dt_to_timestamp
 from .base import ExchangeAPIBase
-
-load_dotenv()
 
 
 def instrument_info_perp(dispatcher: Dispatcher, url: str) -> pd.DataFrame:
@@ -82,16 +79,33 @@ def ohlcv_perp(
         )
         reqs.append(req)
 
-    responses = dispatcher.send_requests(reqs)
-    data = pd.DataFrame()
-    for response in responses:
+    retry = True
+    while retry:
         try:
-            data = pd.concat(
-                [data, OHLCVInterface.extract_response_data(response, ["data"], ["code"], "200000", ["msg"], col_map)],
-                ignore_index=True,
-            )
-        except MissingDataError:
-            continue
+            responses = dispatcher.send_requests(reqs)
+            data = pd.DataFrame()
+            for response in responses:
+                try:
+                    data = pd.concat(
+                        [
+                            data,
+                            OHLCVInterface.extract_response_data(
+                                response, ["data"], ["code"], "200000", ["msg"], col_map
+                            ),
+                        ],
+                        ignore_index=True,
+                    )
+                except MissingDataError:
+                    continue
+            retry = False
+        except APIError as e:
+            if str(e) == "Too Many Requests":
+                # This is due to Kucoin's global cloudfare limit being exceeded: https://github.com/ccxt/ccxt/issues/10273
+                dispatcher.logger.debug("Retrying...")
+                pass
+            else:
+                raise e
+
     return data
 
 
@@ -126,16 +140,32 @@ def ohlcv_spot(
         )
         reqs.append(req)
 
-    responses = dispatcher.send_requests(reqs)
-    data = pd.DataFrame()
-    for response in responses:
+    retry = True
+    while retry:
         try:
-            data = pd.concat(
-                [data, OHLCVInterface.extract_response_data(response, ["data"], ["code"], "200000", ["msg"], col_map)],
-                ignore_index=True,
-            )
-        except MissingDataError:
-            continue
+            responses = dispatcher.send_requests(reqs)
+            data = pd.DataFrame()
+            for response in responses:
+                try:
+                    data = pd.concat(
+                        [
+                            data,
+                            OHLCVInterface.extract_response_data(
+                                response, ["data"], ["code"], "200000", ["msg"], col_map
+                            ),
+                        ],
+                        ignore_index=True,
+                    )
+                except MissingDataError:
+                    continue
+            retry = False
+        except APIError as e:
+            if str(e) == "Too Many Requests":
+                # This is due to Kucoin's global cloudfare limit being exceeded: https://github.com/ccxt/ccxt/issues/10273
+                dispatcher.logger.debug("Retrying...")
+                pass
+            else:
+                raise e
     return data
 
 
@@ -165,21 +195,88 @@ def funding_rate(
         )
         reqs.append(req)
 
-    responses = dispatcher.send_requests(reqs)
-    data = pd.DataFrame()
-    for response in responses:
+    retry = True
+    while retry:
         try:
-            data = pd.concat(
-                [
-                    data,
-                    FundingRateInterface.extract_response_data(
-                        response, ["data", "dataList"], ["code"], "200000", ["msg"], col_map
-                    ),
-                ],
-                ignore_index=True,
-            )
-        except MissingDataError:
-            continue
+            responses = dispatcher.send_requests(reqs)
+            data = pd.DataFrame()
+            for response in responses:
+                try:
+                    data = pd.concat(
+                        [
+                            data,
+                            FundingRateInterface.extract_response_data(
+                                response, ["data", "dataList"], ["code"], "200000", ["msg"], col_map
+                            ),
+                        ],
+                        ignore_index=True,
+                    )
+                except MissingDataError:
+                    continue
+            retry = False
+        except APIError as e:
+            if str(e) == "Too Many Requests":
+                # This is due to Kucoin's global cloudfare limit being exceeded: https://github.com/ccxt/ccxt/issues/10273
+                dispatcher.logger.debug("Retrying...")
+                pass
+            else:
+                raise e
+    return data
+
+
+def funding_rate_internal(
+    dispatcher: Dispatcher,
+    url: str,
+    instrument_id: str,
+    starttimes: List[datetime.datetime],
+    endtimes: List[datetime.datetime],
+    limits: List[int],
+):
+    col_map = {
+        "timePoint": FundingRateSchema.timestamp,
+        "value": FundingRateSchema.funding_rate,
+    }
+    reqs = []
+    for starttime, endtime, limit in zip(starttimes, endtimes, limits):
+        req = Request(
+            "GET",
+            url.format(symbol=instrument_id),
+            params={
+                "symbol": instrument_id,
+                "beginTime": dt_to_timestamp(starttime, granularity="milliseconds"),
+                "endTime": dt_to_timestamp(endtime, granularity="milliseconds"),
+                "maxCount": limit,
+                "reverse": False,
+            },
+        )
+        reqs.append(req)
+
+    retry = True
+    while retry:
+        try:
+            responses = dispatcher.send_requests(reqs)
+            data = pd.DataFrame()
+            for response in responses:
+                try:
+                    data = pd.concat(
+                        [
+                            data,
+                            FundingRateInterface.extract_response_data(
+                                response, ["data", "dataList"], ["code"], "200", ["msg"], col_map
+                            ),
+                        ],
+                        ignore_index=True,
+                    )
+                except MissingDataError:
+                    continue
+            retry = False
+        except APIError as e:
+            if str(e) == "Too Many Requests":
+                # This is due to Kucoin's global cloudfare limit being exceeded: https://github.com/ccxt/ccxt/issues/10273
+                dispatcher.logger.debug("Retrying...")
+                pass
+            else:
+                raise e
     return data
 
 
@@ -275,10 +372,15 @@ class Kucoin(ExchangeAPIBase):
         Interval.interval_1d: ("1day", datetime.timedelta(days=1)),
     }
 
-    def __init__(self, cache_kwargs={"disabled": False, "refresh": False}, log_level: str = "INFO"):
+    def __init__(
+        self,
+        cache_kwargs={"disabled": False, "refresh": False},
+        log_level: str = "INFO",
+        refresh_instruments: bool = False,
+    ):
         super().__init__(cache_kwargs=cache_kwargs, log_level=log_level)
         self.init_dispatchers()
-        self.init_instrument_info_interface()
+        self.init_instrument_info_interface(refresh_instruments)
         self.init_ohlcv_interface()
         self.init_funding_rate_interface()
         self.init_order_book_interface()
@@ -286,13 +388,13 @@ class Kucoin(ExchangeAPIBase):
     def init_dispatchers(self):
         self.logger.debug("initializing dispatchers")
         self.perpetual_dispatcher = Dispatcher(
-            f"{self.name}.dispatcher.perpetual", timeout=1 / 10, pre_request_hook=authenticate_request_perp
+            f"{self.name}.dispatcher.perpetual", timeout=1 / 3, pre_request_hook=authenticate_request_perp
         )
         self.spot_dispatcher = Dispatcher(
-            f"{self.name}.dispatcher.spot", timeout=1 / 10, pre_request_hook=authenticate_request_spot
+            f"{self.name}.dispatcher.spot", timeout=1 / 3, pre_request_hook=authenticate_request_spot
         )
 
-    def init_instrument_info_interface(self):
+    def init_instrument_info_interface(self, refresh):
         perpetual = InstrumentInfoInterface(
             exchange=self,
             interface_name=Interface.INSTRUMENT_INFO,
@@ -311,6 +413,17 @@ class Kucoin(ExchangeAPIBase):
             execute=instrument_info_spot,
         )
 
+        self.perpetual_instruments = perpetual.run(
+            map_column=Instrument.exchange_symbol, cache_kwargs={"refresh": refresh}
+        )
+        self.spot_instruments = spot.run(map_column=Instrument.exchange_symbol, cache_kwargs={"refresh": refresh})
+        self.perpetual_order_book_multis = perpetual.run(
+            map_column=Instrument.orderbook_multi, cache_kwargs={"refresh": refresh}
+        )
+        self.spot_order_book_multis = spot.run(
+            map_column=Instrument.orderbook_multi, cache_kwargs={"refresh": refresh}
+        )
+
         self.interfaces[Interface.INSTRUMENT_INFO] = {
             InstrumentType.PERPETUAL: perpetual,
             InstrumentType.SPOT: spot,
@@ -318,8 +431,9 @@ class Kucoin(ExchangeAPIBase):
 
     def init_ohlcv_interface(self):
         perpetual = OHLCVInterface(
+            instruments=self.perpetual_instruments,
             intervals=self.perpetual_intervals,
-            max_response_limit=1500,
+            max_response_limit=200,
             exchange=self,
             interface_name=Interface.OHLCV,
             inst_type=InstrumentType.PERPETUAL,
@@ -329,8 +443,9 @@ class Kucoin(ExchangeAPIBase):
         )
 
         spot = OHLCVInterface(
+            instruments=self.spot_instruments,
             intervals=self.spot_intervals,
-            max_response_limit=1000,
+            max_response_limit=1500,
             exchange=self,
             interface_name=Interface.OHLCV,
             inst_type=InstrumentType.SPOT,
@@ -346,19 +461,22 @@ class Kucoin(ExchangeAPIBase):
 
     def init_funding_rate_interface(self):
         perpetual = FundingRateInterface(
-            max_response_limit=200,
+            instruments=self.perpetual_dispatcher,
+            max_response_limit=100,
             exchange=self,
             interface_name=Interface.FUNDING_RATE,
             inst_type=InstrumentType.PERPETUAL,
-            url=os.path.join(self.futures_base_url, "api/v1/funding-history"),
+            url="https://futures.kucoin.com/_api/web-front/contract/{symbol}/funding-rates",
             dispatcher=self.perpetual_dispatcher,
-            execute=funding_rate,
+            execute=funding_rate_internal,
         )
 
         self.interfaces[Interface.FUNDING_RATE] = {InstrumentType.PERPETUAL: perpetual}
 
     def init_order_book_interface(self):
         perpetual = OrderBookInterface(
+            instruments=self.perpetual_instruments,
+            multipliers=self.perpetual_order_book_multis,
             exchange=self,
             interface_name=Interface.ORDER_BOOK,
             inst_type=InstrumentType.PERPETUAL,
@@ -368,6 +486,8 @@ class Kucoin(ExchangeAPIBase):
         )
 
         spot = OrderBookInterface(
+            instruments=self.spot_instruments,
+            multipliers=self.spot_order_book_multis,
             exchange=self,
             interface_name=Interface.ORDER_BOOK,
             inst_type=InstrumentType.SPOT,

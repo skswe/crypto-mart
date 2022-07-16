@@ -1,20 +1,23 @@
 from datetime import datetime
+from typing import Dict
 
 import pandas as pd
-from cryptomart.errors import MissingDataError
 
-from ..enums import Instrument, OrderBookSchema, OrderBookSide, Symbol
+from ..enums import OrderBookSchema, OrderBookSide, Symbol
+from ..errors import MissingDataError
 from ..interfaces.api import APIInterface
 
 
 class OrderBookInterface(APIInterface):
     def __init__(
         self,
+        instruments: Dict[Symbol, str],
+        multipliers: Dict[Symbol, float],
         **api_interface_kwargs,
     ):
         super().__init__(**api_interface_kwargs)
-        self.instruments = self.exchange.instrument_info(self.inst_type, map_column=Instrument.exchange_symbol)
-        self.multipliers = self.exchange.instrument_info(self.inst_type, map_column=Instrument.orderbook_multi)
+        self.instruments = instruments
+        self.multipliers = multipliers
 
     def run(self, symbol: Symbol, depth: int, **cache_kwargs) -> pd.DataFrame:
         """Run main interface function
@@ -29,7 +32,6 @@ class OrderBookInterface(APIInterface):
         instrument_id = self.instruments[symbol]
         multiplier = self.multipliers[symbol]
         data = self.execute(self.dispatcher, self.url, instrument_id, depth)
-        print(data)
         data[[OrderBookSchema.price, OrderBookSchema.quantity]] = data[
             [OrderBookSchema.price, OrderBookSchema.quantity]
         ].astype(float)

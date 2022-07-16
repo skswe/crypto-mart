@@ -3,13 +3,13 @@ from typing import Dict, Union
 
 import numpy as np
 import pandas as pd
-from cryptomart.errors import MissingDataError
-from cryptomart.util import parse_time
 from pyutil.cache import cached
 
 from ..enums import Instrument, Symbol
+from ..errors import MissingDataError
 from ..globals import SYMBOL_ALIASES
 from ..interfaces.api import APIInterface
+from ..util import parse_time
 
 
 class InstrumentInfoInterface(APIInterface):

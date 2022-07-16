@@ -1,7 +1,49 @@
-# CRYPTOMART
-This is a module unify the APIs of various crypto exchanges.
+# crypto-mart - crypto exchange data for rapid algotrading development
+
+## Overview
+
+The main goal of this module is to provide a unified API for accessing data
+across various crypto exchanges. This module provides an interface to access the
+following types of data:
+
+- **Historical OHLCV bars (Spot / Perpetual markets)**
+- **Instrument/Contract Info (Spot / perpetual markets)**
+- **Historical Funding Rates (Perpetual markets only)**
+- **Order Book Snapshots (Spot / Perpetual markets)**
+
+## Installation
+
+`pip install git+ssh://git@github.com/senderr/crypto-mart.git`
+
+# A note on caching
+
+All interfaces (except orderbook) will automatically cache the result to disk.
+This design decision is enabled by default because algotrading development is an
+iterative process, and running the same HTTP requests over and over while
+testing code will be a waste of CPU time.
+
+This behaviour can be disabled by passing the keyword argument
+`cache_kwargs={"disabled": True}`
+
+Example:
+
+```
+import cryptomart as cm
+client = cm.Client()
+df = client.ftx.ohlcv("BTC", (2022, 1, 2), (2022, 2, 5), cache_kwargs={"disabled": True})
+```
+
+The default location on disk where data is saved is `/tmp/cache`. This can be
+overridden on each call by passing `cache_kwargs={"path": "/new/path/"}`. It can
+also be overridden globally by setting the environment variable:
+`export CM_CACHE_PATH=/new/path/` in bash or
+`os.environ["CM_CACHE_PATH"] = "/new/path/"` in python
+
+For more details on how to use / customize caching, see:
+https://github.com/senderr/pyutil/blob/master/pyutil/cache.py
 
 # Using the API
+
 Create a `Client` object which contains the main interface for this module
 
 ```
@@ -10,17 +52,22 @@ import cryptomart as cm
 client = cm.Client()
 ```
 
-The client object contains a property for the following exchanges:
- - binance
- - bitmex
- - bybit
- - coinflex
- - ftx
- - gateio
- - kucoin
- - okex
+**Note:** on first run, the client will internally fetch instrument info for
+each exchange / market. In order for the crypto-mart API to stay up to date with
+new symbols added to the exchanges, pass `refresh_instruments=True` to the
+client constructor.
 
-# Features
+The following exchanges are currently supported by the cryptomart API:
+
+- binance
+- bitmex
+- bybit
+- coinflex
+- ftx
+- gateio
+- kucoin
+- okex
+
 ## OHLCV Historical Data
 
 ```
@@ -30,14 +77,15 @@ client = cm.Client()
 
 symbol = "BTC"
 inst_type = "perpetual"
-interval = cm.Interval.interval_1d
 starttime = "2021-07-15"
 endtime = "2022-4-30"
+interval = cm.Interval.interval_1d
 
-client.binance.ohlcv(symbol, inst_type, interval, starttime, endtime)
+client.binance.ohlcv(symbol, inst_type, starttime, endtime, interval)
 ```
 
-Out: 
+Out:
+
 ```
      open_time      open      high       low     close      volume
 0   2021-07-15  32803.00  33170.00  31140.00  31866.43  539111.667
@@ -55,7 +103,34 @@ Out:
 [289 rows x 7 columns]
 ```
 
-OHLCV Historical data is automatically cached to the disk at `/tmp/cache`. This can be disabled by passing the `cache_kwargs={"disabled": True}` parameter to the `ohlcv` call.
+## Instrument Info
+
+```
+import cryptomart as cm
+
+client = cm.Client()
+
+client.kucoin.instrument_info("spot")
+```
+
+Out:
+
+```
+         symbol       name baseCurrency quoteCurrency feeCurrency market baseMinSize  ...  minFunds isMarginEnabled enableTrading cryptomart_symbol exchange_symbol exchange_list_time orderbook_multi
+0       REQ-ETH    REQ-ETH          REQ           ETH         ETH   ALTS           1  ...   0.00001           False          True               REQ         REQ-ETH                NaN             1.0
+1       REQ-BTC    REQ-BTC          REQ           BTC         BTC    BTC           1  ...  0.000001           False          True               REQ         REQ-BTC                NaN             1.0
+2      NULS-ETH   NULS-ETH         NULS           ETH         ETH   ALTS         0.1  ...   0.00001           False          True              NULS        NULS-ETH                NaN             1.0
+3      NULS-BTC   NULS-BTC         NULS           BTC         BTC    BTC         0.1  ...  0.000001           False          True              NULS        NULS-BTC                NaN             1.0
+4       CVC-BTC    CVC-BTC          CVC           BTC         BTC    BTC           1  ...  0.000001           False          True               CVC         CVC-BTC                NaN             1.0
+...         ...        ...          ...           ...         ...    ...         ...  ...       ...             ...           ...               ...             ...                ...             ...
+1261   VSYS-BTC   VSYS-BTC         VSYS           BTC         BTC    BTC         0.1  ...  0.000001           False          True              VSYS        VSYS-BTC                NaN             1.0
+1262    MKR-DAI    MKR-DAI          MKR           DAI         DAI   DeFi      0.0001  ...       0.1           False          True               MKR         MKR-DAI                NaN             1.0
+1263  SOLVE-BTC  SOLVE-BTC        SOLVE           BTC         BTC    BTC          10  ...  0.000001           False          True             SOLVE       SOLVE-BTC                NaN             1.0
+1264   GRIN-BTC   GRIN-BTC         GRIN           BTC         BTC    BTC        0.01  ...  0.000001           False          True              GRIN        GRIN-BTC                NaN             1.0
+1265  GRIN-USDT  GRIN-USDT         GRIN          USDT        USDT   USDS        0.01  ...       0.1           False          True              GRIN       GRIN-USDT                NaN             1.0
+
+[1264 rows x 21 columns]
+```
 
 ## Order Book Snapshot
 
@@ -71,7 +146,8 @@ depth = 20
 client.binance.order_book(symbol, inst_type, depth)
 ```
 
-Out: 
+Out:
+
 ```
       price  quantity side           timestamp
 0   38595.9     7.058    b 2022-05-01 23:28:03
@@ -114,4 +190,37 @@ Out:
 37  38598.6     0.001    a 2022-05-01 23:28:03
 38  38598.7     0.006    a 2022-05-01 23:28:03
 39  38598.8     0.008    a 2022-05-01 23:28:03
+```
+
+## Historical Funding Rate
+
+```
+import cryptomart as cm
+
+client = cm.Client()
+
+symbol = "BTC"
+starttime = "2021-07-15"
+endtime = "2022-4-30"
+
+client.binance.funding_rate(symbol, starttime, endtime, cache_kwargs={"disabled": True})
+```
+
+Out:
+
+```
+              timestamp  funding_rate
+0   2021-07-15 00:00:00     -0.000049
+1   2021-07-15 08:00:00      0.000100
+2   2021-07-15 16:00:00      0.000016
+3   2021-07-16 00:00:00     -0.000115
+4   2021-07-16 08:00:00      0.000061
+..                  ...           ...
+862 2022-04-28 08:00:00     -0.000055
+863 2022-04-28 16:00:00      0.000100
+864 2022-04-29 00:00:00      0.000100
+865 2022-04-29 08:00:00      0.000100
+866 2022-04-29 16:00:00      0.000026
+
+[867 rows x 2 columns]
 ```

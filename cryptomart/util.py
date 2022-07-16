@@ -27,8 +27,12 @@ def parse_time(time: TimeType) -> datetime.datetime:
         return time.to_pydatetime().replace(tzinfo=None, microsecond=0)
     elif isinstance(time, int) or isinstance(time, float):
         return int_to_dt(time)
-    elif isinstance(time, datetime.datetime):
-        return time.replace(tzinfo=None, microsecond=0)
+    elif isinstance(time, datetime.date):
+        try:
+            return time.replace(tzinfo=None, microsecond=0)
+        except TypeError:
+            # time is a date
+            return datetime.datetime(time.year, time.month, time.day)
     elif isinstance(time, tuple):
         return datetime.datetime(*time, tzinfo=None)
     elif isinstance(time, str):
@@ -153,13 +157,21 @@ class Clock:
 
 
 class Dispatcher:
-    def __init__(self, name: str, dispatch_fn: Callable = None, timeout: float = 0, pre_request_hook=None):
+    def __init__(
+        self,
+        name: str,
+        dispatch_fn: Callable = None,
+        timeout: float = 0,
+        pre_request_hook=None,
+        limit_exceeded_delay: int = 10,
+    ):
         self.dispatch_fn = dispatch_fn or self._default_dispatch_fn
         self.pre_request_hook = pre_request_hook or (lambda r: r)
         self.pending_queue = Queue()
         self.result_queue = Queue()
 
         self.timeout = timeout
+        self.limit_exceeded_delay = limit_exceeded_delay
 
         self.logger = logging.getLogger(f"cryptomart.{name}")
 
@@ -169,13 +181,24 @@ class Dispatcher:
 
     def _default_dispatch_fn(self, request: requests.Request) -> Union[JSONDataType, None]:
         self.logger.debug(f"Dispatcher: Making request -- {request.method}: {request.url}, params={request.params}")
-        try:
-            with requests.Session() as s:
-                res = s.send(self.pre_request_hook(request.prepare())).json()
-            assert isinstance(res, dict) or isinstance(res, list), f"Unexpected response: {res}"
-        except Exception as e:
-            self.logger.error(f"Dispatcher: Error in request -- {request.method}: {request.url}: {e}", exc_info=True)
-            res = None
+        retry = True
+        while retry:
+            try:
+                with requests.Session() as s:
+                    res = s.send(self.pre_request_hook(request.prepare()))
+                    if res.status_code == 429:
+                        self.logger.debug(f"Status 429 received, sleeping for {self.limit_exceeded_delay} seconds...")
+                        time.sleep(self.limit_exceeded_delay)
+                        continue
+                    res = res.json()
+                    retry = False
+                    assert isinstance(res, dict) or isinstance(res, list), f"Unexpected response: {res}"
+            except Exception as e:
+                self.logger.error(
+                    f"Dispatcher: Error in request -- {request.method}: {request.url}: {e}", exc_info=True
+                )
+                retry = False
+                res = None
         self.logger.debug("Dispatcher: Got response")
         return res
 
