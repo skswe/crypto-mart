@@ -1,10 +1,35 @@
-[build-system]
-requires = ["setuptools"]
-build-backend = "setuptools.build_meta"
-
 [tool.black]
 line-length = 119
 
 [tool.pytest.ini_options]
 log_cli = false
 markers = ["requires_http"]
+
+[project]
+name = "crypto-mart"
+version = "2.0.13"
+readme = "README.md"
+license = {file = "LICENSE"}
+authors = [
+  {email = "stefano.katsoras@gmail.com"},
+  {name = "Stefano Katsoras"}
+]
+maintainers = [
+  {name = "Stefano Katsoras", email = "stefano.katsoras@gmail.com"}
+]
+dependencies = [
+  "requests",
+  "pandas",
+  "numpy",
+  "pyutil @ git+ssh://git@github.com/senderr/pyutil.git"
+]
+
+[project.urls]
+repository = "https://github.com/senderr/crypto-mart"
+
+[tool.setuptools]
+packages = ["cryptomart"]
+
+[build-system]
+requires = ["setuptools"]
+build-backend = "setuptools.build_meta"
