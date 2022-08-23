@@ -5,7 +5,7 @@ import numpy as np
 import pandas as pd
 from pyutil.cache import cached
 
-from ..enums import Instrument, Symbol
+from ..enums import Instrument
 from ..errors import MissingDataError
 from ..globals import SYMBOL_ALIASES
 from ..interfaces.api import APIInterface
@@ -24,13 +24,13 @@ class InstrumentInfoInterface(APIInterface):
         instance_identifiers=["name"],
         instance_path_seperators=["exchange_name", "inst_type"],
     )
-    def run(self, map_column: str, **cache_kwargs) -> Union[pd.DataFrame, Dict[Symbol, str]]:
+    def run(self, map_column: str, **cache_kwargs) -> Union[pd.DataFrame, Dict[str, str]]:
         """Run main interface function
 
         Args:
-            map_column (str): If provided, returns a dict of Symbol -> map_column
+            map_column (str): If provided, returns a dict of symbol -> map_column
         Returns:
-            pd.DataFrame: Instrument info or Mapping of `Symbol` enum to API instrument ID
+            pd.DataFrame: Instrument info or Mapping of cryptomart symbol to API instrument ID
         """
         data = self.execute(self.dispatcher, self.url)
         data[Instrument.cryptomart_symbol].replace(SYMBOL_ALIASES, inplace=True)

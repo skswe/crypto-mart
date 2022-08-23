@@ -4,7 +4,7 @@ from typing import Any, Dict, Union
 
 import pandas as pd
 
-from ..enums import InstrumentType, Interface, Interval, Symbol
+from ..enums import InstrumentType, Interface, Interval
 from ..errors import NotSupportedError
 from ..feeds import OHLCVFeed
 from ..types import TimeType
@@ -58,15 +58,15 @@ class ExchangeAPIBase(ABC):
 
     def instrument_info(
         self, inst_type: InstrumentType, map_column: str = None, cache_kwargs: dict = {}
-    ) -> Union[pd.DataFrame, Dict[Symbol, Any]]:
+    ) -> Union[pd.DataFrame, Dict[str, Any]]:
         """Get instrument info
 
         Args:
             inst_type (InstrumentType): Type of instrument to retrieve info for.
-            map_column (str): If provided, returns a dict of Symbol -> map_column.
+            map_column (str): If provided, returns a dict of symbol -> map_column.
             cache_kwargs (dict): Optional cache control settings. See pyutil.cache.cached for details.
         Returns:
-            Union[pd.DataFrame, Dict[Symbol, Any]]: Instrument info
+            Union[pd.DataFrame, Dict[str, Any]]: Instrument info
         """
         args = (map_column,)
         return self._run_interface(
@@ -75,7 +75,7 @@ class ExchangeAPIBase(ABC):
 
     def ohlcv(
         self,
-        symbol: Symbol,
+        symbol: str,
         inst_type: InstrumentType,
         starttime: TimeType,
         endtime: TimeType,
@@ -86,7 +86,7 @@ class ExchangeAPIBase(ABC):
         """Get historical OHLCV candlesticks
 
         Args:
-            symbol (Symbol): Symbol to query
+            symbol (str): Symbol to query
             inst_type (InstrumentType): Type of instrument to query
             interval (Interval): Interval or frequency of bars
             starttime (TimeType): Time of the first open
@@ -107,7 +107,7 @@ class ExchangeAPIBase(ABC):
 
     def funding_rate(
         self,
-        symbol: Symbol,
+        symbol: str,
         starttime: TimeType,
         endtime: TimeType,
         strict: bool = False,
@@ -116,7 +116,7 @@ class ExchangeAPIBase(ABC):
         """Run main interface function
 
         Args:
-            symbol (Symbol): Symbol to query
+            symbol (str): Symbol to query
             starttime (TimeType): Time of the first open
             endtime (TimeType): Time of the last close
             strict (bool): If `True`, raises an exception when missing data is above threshold
@@ -135,11 +135,11 @@ class ExchangeAPIBase(ABC):
             cache_kwargs=dict(self.cache_kwargs, **cache_kwargs),
         )
 
-    def order_book(self, symbol: Symbol, inst_type: InstrumentType, depth: int = 20, cache_kwargs: dict = {}):
+    def order_book(self, symbol: str, inst_type: InstrumentType, depth: int = 20, cache_kwargs: dict = {}):
         """Get orderbook snapshot
 
         Args:
-            symbol (Symbol): Symbol to query
+            symbol (str): Symbol to query
             inst_type (InstrumentType): Type of instrument to query
             depth (int): Number of bids/asks to include in the snapshot
             cache_kwargs (dict): Optional cache control settings. See pyutil.cache.cached for details.

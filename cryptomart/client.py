@@ -8,7 +8,7 @@ from typing import Any, Dict, List, Union
 
 import pandas as pd
 
-from .enums import Exchange, InstrumentType, Interval, Symbol
+from .enums import Exchange, InstrumentType, Interval
 from .exchanges import FTX, Binance, BitMEX, Bybit, CoinFLEX, GateIO, Kucoin, OKEx
 from .exchanges.base import ExchangeAPIBase
 from .feeds import FundingRateFeed, OHLCVFeed
@@ -76,16 +76,16 @@ class Client:
 
     def instrument_info(
         self, exchange: Exchange, inst_type: InstrumentType, map_column: str = None, cache_kwargs: dict = {}
-    ) -> Union[pd.DataFrame, Dict[Symbol, Any]]:
+    ) -> Union[pd.DataFrame, Dict[str, Any]]:
         """Get instrument info
 
         Args:
             exchange (Exchange): Registered exchange to call
             inst_type (InstrumentType): Type of instrument to retrieve info for.
-            map_column (str): If provided, returns a dict of Symbol -> map_column.
+            map_column (str): If provided, returns a dict of symbol -> map_column.
             cache_kwargs (dict): Optional cache control settings. See pyutil.cache.cached for details.
         Returns:
-            Union[pd.DataFrame, Dict[Symbol, Any]]: Instrument info
+            Union[pd.DataFrame, Dict[str, Any]]: Instrument info
         """
         return self._exchange_instance_map[exchange].instrument_info(
             inst_type, map_column=map_column, cache_kwargs=cache_kwargs
@@ -94,7 +94,7 @@ class Client:
     def ohlcv(
         self,
         exchange: Exchange,
-        symbol: Symbol,
+        symbol: str,
         inst_type: InstrumentType,
         starttime: TimeType,
         endtime: TimeType,
@@ -106,7 +106,7 @@ class Client:
 
         Args:
             exchange (Exchange): Registered exchange to call
-            symbol (Symbol): Symbol to query
+            symbol (str): Symbol to query
             inst_type (InstrumentType): Type of instrument to query
             interval (Interval): Interval or frequency of bars
             starttime (TimeType): Time of the first open
@@ -133,7 +133,7 @@ class Client:
     def funding_rate(
         self,
         exchange: Exchange,
-        symbol: Symbol,
+        symbol: str,
         starttime: TimeType,
         endtime: TimeType,
         strict: bool = False,
@@ -143,7 +143,7 @@ class Client:
 
         Args:
             exchange (Exchange): Registered exchange to call
-            symbol (Symbol): Symbol to query
+            symbol (str): Symbol to query
             starttime (TimeType): Time of the first open
             endtime (TimeType): Time of the last close
             strict (bool): If `True`, raises an exception when missing data is above threshold
@@ -159,13 +159,13 @@ class Client:
         )
 
     def order_book(
-        self, exchange: Exchange, symbol: Symbol, inst_type: InstrumentType, depth: int = 20, cache_kwargs: dict = {}
+        self, exchange: Exchange, symbol: str, inst_type: InstrumentType, depth: int = 20, cache_kwargs: dict = {}
     ):
         """Get orderbook snapshot
 
         Args:
             exchange (Exchange): Registered exchange to call
-            symbol (Symbol): Symbol to query
+            symbol (str): Symbol to query
             inst_type (InstrumentType): Type of instrument to query
             depth (int): Number of bids/asks to include in the snapshot
             cache_kwargs (dict): Optional cache control settings. See pyutil.cache.cached for details.

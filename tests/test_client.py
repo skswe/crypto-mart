@@ -3,8 +3,7 @@ from datetime import datetime
 
 import pytest
 from cryptomart.client import Client
-from cryptomart.enums import (Exchange, Instrument, InstrumentType, Interval,
-                              OrderBookSchema, OrderBookSide, Symbol)
+from cryptomart.enums import Exchange, Instrument, InstrumentType, Interval, OrderBookSchema, OrderBookSide
 from cryptomart.exchanges.base import ExchangeAPIBase, NotSupportedError
 
 PRINT = False
@@ -38,13 +37,13 @@ def test_instrument_info(exchange: ExchangeAPIBase, inst_type: InstrumentType):
 
 
 @pytest.mark.parametrize("inst_type", [InstrumentType.SPOT, InstrumentType.PERPETUAL])
-@pytest.mark.parametrize("symbol", [Symbol.BTC, Symbol.ADA, Symbol.DOGE])
+@pytest.mark.parametrize("symbol", ["BTC", "ADA", "DOGE"])
 @pytest.mark.parametrize("interval", [Interval.interval_1d, Interval.interval_1h])
 @pytest.mark.parametrize(["starttime", "endtime"], [(datetime(2022, 5, 25), datetime(2022, 6, 3))])
 @pytest.mark.requires_http
 def test_ohlcv(
     exchange: ExchangeAPIBase,
-    symbol: Symbol,
+    symbol: str,
     inst_type: InstrumentType,
     interval: Interval,
     starttime: datetime,
@@ -63,12 +62,12 @@ def test_ohlcv(
 
 
 @pytest.mark.parametrize("inst_type", [InstrumentType.PERPETUAL, InstrumentType.SPOT])
-@pytest.mark.parametrize("symbol", [Symbol.BTC, Symbol.ETH])
+@pytest.mark.parametrize("symbol", ["BTC", "ETH"])
 @pytest.mark.parametrize("depth", [20])
 @pytest.mark.requires_http
-def test_orderbook(exchange: ExchangeAPIBase, symbol: Symbol, inst_type: InstrumentType, depth: int):
+def test_orderbook(exchange: ExchangeAPIBase, symbol: str, inst_type: InstrumentType, depth: int):
     orderbook = exchange.order_book(symbol, inst_type, depth)
-    assert (sorted(orderbook.columns) == sorted(OrderBookSchema._names()))
+    assert sorted(orderbook.columns) == sorted(OrderBookSchema._names())
 
     bids = orderbook[orderbook[OrderBookSchema.side] == OrderBookSide.bid].reset_index(drop=True)
     asks = orderbook[orderbook[OrderBookSchema.side] == OrderBookSide.ask].reset_index(drop=True)
@@ -83,10 +82,10 @@ def test_orderbook(exchange: ExchangeAPIBase, symbol: Symbol, inst_type: Instrum
         print(orderbook)
 
 
-@pytest.mark.parametrize("symbol", [Symbol.BTC, Symbol.ADA, Symbol.DOGE])
+@pytest.mark.parametrize("symbol", ["BTC", "ADA", "DOGE"])
 @pytest.mark.parametrize(["starttime", "endtime"], [(datetime(2022, 5, 25), datetime(2022, 6, 3))])
 @pytest.mark.requires_http
-def test_funding_rate(exchange: ExchangeAPIBase, symbol: Symbol, starttime: datetime, endtime: datetime):
+def test_funding_rate(exchange: ExchangeAPIBase, symbol: str, starttime: datetime, endtime: datetime):
     try:
         df = exchange.funding_rate(symbol, starttime, endtime)
         timedelta = exchange._get_interface("funding_rate", "perpetual").funding_interval
