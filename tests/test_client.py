@@ -19,7 +19,7 @@ EXCHANGES = WHITELIST - BLACKLIST
 
 @pytest.fixture(scope="module")
 def client():
-    return Client(exchange_init_kwargs={"cache_kwargs": CACHE_KWARGS, "log_level": LOG_LEVEL})
+    return Client(cache_kwargs=CACHE_KWARGS, log_level=LOG_LEVEL)
 
 
 @pytest.fixture(params=EXCHANGES)

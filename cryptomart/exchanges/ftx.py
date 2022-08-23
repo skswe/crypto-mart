@@ -76,7 +76,7 @@ def ohlcv(
             params={
                 "resolution": interval_id,
                 "start_time": dt_to_timestamp(starttime, granularity="seconds"),
-                "endTime": dt_to_timestamp(endtime, granularity="seconds"),
+                "end_time": dt_to_timestamp(endtime, granularity="seconds"),
             },
         )
         reqs.append(req)
