@@ -374,13 +374,13 @@ class Kucoin(ExchangeAPIBase):
 
     def __init__(
         self,
-        cache_kwargs={"disabled": False, "refresh": False},
+        cache_kwargs: dict = {"disabled": False, "refresh": False},
         log_level: str = "INFO",
-        refresh_instruments: bool = False,
+        instrument_cache_kwargs: dict = {"disabled": False, "refresh": False},
     ):
         super().__init__(cache_kwargs=cache_kwargs, log_level=log_level)
         self.init_dispatchers()
-        self.init_instrument_info_interface(refresh_instruments)
+        self.init_instrument_info_interface(instrument_cache_kwargs)
         self.init_ohlcv_interface()
         self.init_funding_rate_interface()
         self.init_order_book_interface()
@@ -394,7 +394,7 @@ class Kucoin(ExchangeAPIBase):
             f"{self.name}.dispatcher.spot", timeout=1 / 3, pre_request_hook=authenticate_request_spot
         )
 
-    def init_instrument_info_interface(self, refresh):
+    def init_instrument_info_interface(self, cache_kwargs):
         perpetual = InstrumentInfoInterface(
             exchange=self,
             interface_name=Interface.INSTRUMENT_INFO,
@@ -413,16 +413,12 @@ class Kucoin(ExchangeAPIBase):
             execute=instrument_info_spot,
         )
 
-        self.perpetual_instruments = perpetual.run(
-            map_column=Instrument.exchange_symbol, cache_kwargs={"refresh": refresh}
-        )
-        self.spot_instruments = spot.run(map_column=Instrument.exchange_symbol, cache_kwargs={"refresh": refresh})
+        self.perpetual_instruments = perpetual.run(map_column=Instrument.exchange_symbol, cache_kwargs=cache_kwargs)
+        self.spot_instruments = spot.run(map_column=Instrument.exchange_symbol, cache_kwargs=cache_kwargs)
         self.perpetual_order_book_multis = perpetual.run(
-            map_column=Instrument.orderbook_multi, cache_kwargs={"refresh": refresh}
+            map_column=Instrument.orderbook_multi, cache_kwargs=cache_kwargs
         )
-        self.spot_order_book_multis = spot.run(
-            map_column=Instrument.orderbook_multi, cache_kwargs={"refresh": refresh}
-        )
+        self.spot_order_book_multis = spot.run(map_column=Instrument.orderbook_multi, cache_kwargs=cache_kwargs)
 
         self.interfaces[Interface.INSTRUMENT_INFO] = {
             InstrumentType.PERPETUAL: perpetual,

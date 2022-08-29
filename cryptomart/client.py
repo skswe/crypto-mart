@@ -28,7 +28,7 @@ class Client:
         log_level: str = "INFO",
         log_file: str = None,
         quiet: bool = False,
-        refresh_instruments: bool = False,
+        instrument_cache_kwargs: dict = {"disabled": False, "refresh": False},
         **kwargs,
     ):
         """Unified interface to all registered Exchanges.
@@ -39,7 +39,6 @@ class Client:
             log_file (str, optional): file to save logs to. Defaults to None.
             exchange_init_kwargs: kwargs to pass to creation of each exchange object in `exchanges`
             quiet: If True, hides initialization logs.
-            refresh_instruments (bool): If True, refreshes the instrument cache
         """
         if quiet:
             # Disables all logs at INFO or below
@@ -66,7 +65,7 @@ class Client:
         self._active_exchanges = [getattr(Exchange, e) for e in exchanges]
         self._exchange_instance_map: Dict[Exchange, ExchangeAPIBase] = {}
         self._exchange_class_map = {}
-        self._load_exchanges(cache_kwargs=cache_kwargs, log_level=log_level, refresh_instruments=refresh_instruments)
+        self._load_exchanges(cache_kwargs=cache_kwargs, log_level=log_level, instrument_cache_kwargs=instrument_cache_kwargs)
         logger.info("Client initialized")
         logger.info("=" * 80)
 
