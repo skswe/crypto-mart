@@ -41,9 +41,9 @@ class FundingRateInterface(APIInterface):
 
     @cached(
         os.path.join(os.getenv("CM_CACHE_PATH", "/tmp/cache"), "funding_rate"),
-        is_method=True,
         instance_identifiers=["name"],
         instance_path_seperators=["exchange_name", "inst_type"],
+        name="funding_rate",
     )
     def run(
         self,
