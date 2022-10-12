@@ -77,5 +77,3 @@ class BybitSocket():
         #     req['args'][0] = req['args'][0] + symbol + "|"
         # req['args'][0] = req['args'][0][:-1]
         self.websocket.send(json.dumps(req))
-
-test = BybitSocket()

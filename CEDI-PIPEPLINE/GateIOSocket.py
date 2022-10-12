@@ -85,4 +85,4 @@ class GateIOSocket():
             self.websocket.send(json.dumps(req))
 
 
-test = GateIOSocket()
+

@@ -6,6 +6,7 @@ import rel
 import json
 import sys
 from threading import Thread, Timer
+import traceback
 
 
 
@@ -164,4 +165,3 @@ class BinanceSocket():
 
 
 
-test = BinanceSocket()

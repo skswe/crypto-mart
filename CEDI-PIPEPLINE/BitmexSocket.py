@@ -103,4 +103,3 @@ class BitMexSocket():
             self.ws.send(json.dumps(req))
 
 
-test = BitMexSocket()

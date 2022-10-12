@@ -101,4 +101,3 @@ class OKEXSocket():
 
         self.websocket.send(json.dumps(req))
 
-test = OKEXSocket()
