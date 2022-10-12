@@ -5,7 +5,7 @@ import json
 import sys
 from threading import Thread, Timer
 import traceback
-import multiprocessing
+
 
 
 class BitMexSocket():

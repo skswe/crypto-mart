@@ -8,7 +8,6 @@ import sys
 import time
 from threading import Thread, Timer
 import traceback
-import multiprocessing
 
 
 class GateIOSocket():

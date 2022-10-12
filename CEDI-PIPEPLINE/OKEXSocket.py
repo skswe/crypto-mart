@@ -1,6 +1,5 @@
 from time import sleep
 import websocket
-import rel
 import json
 import sys
 from threading import Thread, Timer

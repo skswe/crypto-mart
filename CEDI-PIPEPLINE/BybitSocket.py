@@ -5,7 +5,6 @@ import json
 import requests
 import sys
 from threading import Thread, Timer
-import traceback
 
 
 class BybitSocket():
