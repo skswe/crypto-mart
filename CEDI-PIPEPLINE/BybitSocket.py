@@ -4,6 +4,7 @@ import rel
 import json
 import requests
 import sys
+import DatabaseHandler
 from threading import Thread, Timer
 
 
@@ -12,8 +13,9 @@ class BybitSocket():
         self.base_url = 'wss://stream-testnet.bybit.com/realtime'
         self.websocket = None
         self.symbols = []
+        self.handler = DatabaseHandler.DatabaseHandler()
         self.connect()
-        # self.socket = f'{self.fullUrl}'
+        
 
     def close(self):
         if self.thread and self.thread.isAlive():
@@ -30,10 +32,8 @@ class BybitSocket():
                     f.write(str(data))
                     f.write(f'\n')
             else: 
-                #temporary save to text file for testing, data will be sent to datahandler module to be saved to database
                 with open('bybitKlines.txt', 'a') as f:
-                    f.write(str(data))
-                    f.write(f'\n')
+                    self.handler.add_kline_bybit(data,response['topic'].removeprefix('klineV2.15.'))
 
         def on_close(ws):
             print("closed connection")
@@ -77,3 +77,4 @@ class BybitSocket():
         #     req['args'][0] = req['args'][0] + symbol + "|"
         # req['args'][0] = req['args'][0][:-1]
         self.websocket.send(json.dumps(req))
+test = BybitSocket()

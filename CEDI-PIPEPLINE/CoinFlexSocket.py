@@ -1,3 +1,4 @@
+from cgi import test
 from time import sleep
 import websocket
 import rel
@@ -6,6 +7,7 @@ import requests
 import sys
 from threading import Thread, Timer
 import traceback
+import DatabaseHandler
 
 
 class CoinFlexSocket():
@@ -13,6 +15,7 @@ class CoinFlexSocket():
         self.base_url = 'wss://v2api.coinflex.com/v2/websocket'
         self.websocket = None
         self.symbols = []
+        self.handler = DatabaseHandler.DatabaseHandler()
         self.connect()
         # self.socket = f'{self.fullUrl}'
 
@@ -25,11 +28,11 @@ class CoinFlexSocket():
         def on_message(ws, message):
             response = json.loads(message)
             data = response['data']
-            print(response)
             if response['table'] == 'candles300s':
                 print('here')
                 # temporary save to text file for testing, data will be sent to datahandler module to be saved to database
                 with open('CoinFlexKlines.txt', 'a') as f:
+                    self.handler.add_kline_coinflex(data, data[0]['marketCode'])
                     f.write(str(data))
                     f.write(f'\n')
             elif response['table'] == 'depthL10':
@@ -83,5 +86,5 @@ class CoinFlexSocket():
             req['args'].append("depthL10:" + symbol) 
        self.websocket.send(json.dumps(req))
 
-
+test = CoinFlexSocket()
 

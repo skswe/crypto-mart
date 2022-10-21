@@ -4,6 +4,7 @@ import json
 import sys
 from threading import Thread, Timer
 import traceback
+import DatabaseHandler
 
 
 class OKEXSocket():
@@ -11,6 +12,7 @@ class OKEXSocket():
         self.base_url = 'wss://ws.okx.com:8443/ws/v5/public'
         self.websocket = None
         self.instrument_ids = []
+        self.handler = DatabaseHandler.DatabaseHandler()
         self.connect()
 
 
@@ -29,15 +31,14 @@ class OKEXSocket():
             elif response['arg']['channel'] == 'books': 
                 #temporary save to text file for testing, data will be sent to datahandler module to be saved to database
                 with open('okexBooks.txt', 'a') as f:
+                    self.handler.add_books_okex(data,response['arg']["instId"])
                     f.write(response['arg']["instId"])
                     f.write(str(data))
                     f.write(f'\n')
             elif response['arg']['channel'] == 'candle15m': 
                 #temporary save to text file for testing, data will be sent to datahandler module to be saved to database
                 with open('Klines.txt', 'a') as f:
-                    f.write(response['arg']["instId"])
-                    f.write(str(data))
-                    f.write(f'\n')
+                    self.handler.add_kline_okex(data,response['arg']["instId"])
     
 
         def on_close(ws):
@@ -101,3 +102,4 @@ class OKEXSocket():
 
         self.websocket.send(json.dumps(req))
 
+test = OKEXSocket()

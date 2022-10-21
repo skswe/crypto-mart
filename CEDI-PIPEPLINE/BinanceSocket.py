@@ -7,6 +7,7 @@ import json
 import sys
 from threading import Thread, Timer
 import traceback
+import DatabaseHandler
 
 
 
@@ -18,6 +19,7 @@ class BinanceSocket():
         self.book_urls = []
         self.websockets = []
         self.thread = []
+        self.handler = DatabaseHandler.DatabaseHandler()
         self.book_data_cache = []
         self.book_symbols_cache = set()
         self.connect()
@@ -130,6 +132,7 @@ class BinanceSocket():
                         if timeDiff >= 0 and timeDiff <= 3000:
                             #temporary save to text file for testing, data will be sent to datahandler module to be saved to database
                             with open('binanceKlines.txt', 'a') as f:
+                                self.handler.add_kline_binance(data, data['s'])
                                 f.write(str(data))
                                 f.write(f'\n')
                     elif response['e'] == 'depthUpdate':
@@ -164,4 +167,4 @@ class BinanceSocket():
         self.get_instruments_from_stream()
 
 
-
+test= BinanceSocket()
