@@ -84,6 +84,15 @@ class DatabaseHandler:
             self.db.commit()
             print(self.cursor.rowcount, "record inserted okex.")
 
+    def add_kline_kucoin(self, data, symbol):
+        sql = "INSERT INTO klines (exchange_name, symbol_name, event_time, open, close, high, low, volume) VALUES (%s, %s, %s, %s, %s, %s, %s, %s)"
+        values = ('kucoin', symbol, time.strftime('%Y-%m-%d %H:%M:%S', time.localtime(
+            int(data['candles'][0]))), float(data['candles'][1]), float(data['candles'][2]), float(data['candles'][3]), float(data['candles'][4]), float(data['candles'][5]))
+        if self.query_timestamp_kline('kucoin', symbol):
+            self.cursor.execute(sql, values)
+            self.db.commit()
+            print(self.cursor.rowcount, "record inserted kucoin.")
+
     def add_kline_binance(self, data, symbol):
         sql = "INSERT INTO klines (exchange_name, symbol_name, event_time, open, close, high, low, volume) VALUES (%s, %s, %s, %s, %s, %s, %s, %s)"
         values = ('binance', symbol, time.strftime('%Y-%m-%d %H:%M:%S', time.localtime(
@@ -121,7 +130,6 @@ class DatabaseHandler:
             print(self.cursor.rowcount, "record inserted into coinflex books.")
 
     def add_books_binance(self, data, symbol):
-        print(data, symbol)
         sql = "INSERT INTO orderbooks (exchange_name, symbol_name, event_time, asks, bids) VALUES (%s, %s, %s, %s, %s)"
         values = ('binance', symbol, time.strftime('%Y-%m-%d %H:%M:%S', time.localtime(
             int(data[2])/1000)),  json.dumps(data[4]),  json.dumps(data[3]))
@@ -129,6 +137,15 @@ class DatabaseHandler:
             self.cursor.execute(sql, values)
             self.db.commit()
             print(self.cursor.rowcount, "record inserted into books.")
+
+    def add_books_kucoin(self, data, symbol):
+        sql = "INSERT INTO orderbooks (exchange_name, symbol_name, event_time, asks, bids) VALUES (%s, %s, %s, %s, %s)"
+        values = ('kucoin', symbol, time.strftime('%Y-%m-%d %H:%M:%S', time.localtime(
+            int(data['timestamp'])/1000)),  json.dumps(data["asks"]),  json.dumps(data["bids"]))
+        if self.query_timestamp_books('binance', symbol):
+            self.cursor.execute(sql, values)
+            self.db.commit()
+            print(self.cursor.rowcount, "record inserted into kucoin.")
 
     def query_records_exchange(self, exchange):
         print(exchange)
@@ -144,7 +161,8 @@ class DatabaseHandler:
         if self.cursor.fetchone() is None:
             return True
         else:
-            print(datetime_3minutes > (datetime.now() - self.cursor.fetchone()[0]))
+            print(datetime_3minutes > (
+                datetime.now() - self.cursor.fetchone()[0]))
             return datetime_3minutes > (datetime.now() - self.cursor.fetchone()[0])
 
     def query_timestamp_books(self, exchange, symbol):
@@ -156,7 +174,8 @@ class DatabaseHandler:
             print('no records')
             return True
         else:
-            print(datetime_3minutes > (datetime.now() - self.cursor.fetchone()[0]))
+            print(datetime_3minutes > (
+                datetime.now() - self.cursor.fetchone()[0]))
             return datetime_3minutes > (datetime.now() - self.cursor.fetchone()[0])
 
     def delete_all_records(self):

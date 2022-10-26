@@ -30,14 +30,9 @@ class GateIOSocket():
             response = json.loads(message)
             data = response['result']
             if response['channel'] == "spot.candlesticks" and data != None and 'status' not in data:
-                with open('GateIOKlines.txt', 'a') as f:
-                    self.handler.add_kline_gateio(data, data['n'])
+                self.handler.add_kline_gateio(data, data['n'])
             elif response['channel'] == "spot.order_book" and data != None and 'status' not in data:
-                # temporary save to text file for testing, data will be sent to datahandler module to be saved to database
-                with open('GateIOBooks.txt', 'a') as f:
-                    self.handler.add_books_gateio(data, data['s'])
-                    f.write(str(data))
-                    f.write(f'\n')
+                self.handler.add_books_gateio(data, data['s'])
 
         def on_close(ws):
             print("closed connection")
@@ -69,7 +64,7 @@ class GateIOSocket():
             req = {
                 "time": int(time.time()),
                 "channel": "spot.candlesticks",
-                "event": "subscribe",  
+                "event": "subscribe",
                 "payload": ["15m", symbol]
             }
             self.websocket.send(json.dumps(req))
@@ -80,7 +75,7 @@ class GateIOSocket():
             req = {
                 "time": int(time.time()),
                 "channel": "spot.order_book",
-                "event": "subscribe", 
+                "event": "subscribe",
                 "payload": [symbol, "20", "1000ms"]
             }
             self.websocket.send(json.dumps(req))
