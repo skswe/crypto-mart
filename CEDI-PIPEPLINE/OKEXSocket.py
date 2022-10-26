@@ -15,7 +15,6 @@ class OKEXSocket():
         self.handler = DatabaseHandler.DatabaseHandler()
         self.connect()
 
-
     def close(self):
         if self.thread and self.thread.isAlive():
             print(u'OKEX.close')
@@ -28,18 +27,10 @@ class OKEXSocket():
             data = response['data']
             if response['arg']['channel'] == 'instruments':
                 self.instrument_ids = list(map(lambda d: d['instId'], data))
-            elif response['arg']['channel'] == 'books': 
-                #temporary save to text file for testing, data will be sent to datahandler module to be saved to database
-                with open('okexBooks.txt', 'a') as f:
-                    self.handler.add_books_okex(data,response['arg']["instId"])
-                    f.write(response['arg']["instId"])
-                    f.write(str(data))
-                    f.write(f'\n')
-            elif response['arg']['channel'] == 'candle15m': 
-                #temporary save to text file for testing, data will be sent to datahandler module to be saved to database
-                with open('Klines.txt', 'a') as f:
-                    self.handler.add_kline_okex(data,response['arg']["instId"])
-    
+            elif response['arg']['channel'] == 'books':
+                self.handler.add_books_okex(data, response['arg']["instId"])
+            elif response['arg']['channel'] == 'candle15m':
+                self.handler.add_kline_okex(data, response['arg']["instId"])
 
         def on_close(ws):
             print("closed connection")
@@ -90,7 +81,7 @@ class OKEXSocket():
             req['args'].append({"channel": "candle15m", "instId": id})
 
         self.websocket.send(json.dumps(req))
-    
+
     def subscribe_to_orderbook_streams(self):
         sleep(3)
         req = {
@@ -101,5 +92,6 @@ class OKEXSocket():
             req['args'].append({"channel": "books", "instId": id})
 
         self.websocket.send(json.dumps(req))
+
 
 test = OKEXSocket()

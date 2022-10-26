@@ -1,4 +1,5 @@
 from cgi import test
+from symtable import Symbol
 from time import sleep
 import websocket
 import rel
@@ -29,17 +30,9 @@ class CoinFlexSocket():
             response = json.loads(message)
             data = response['data']
             if response['table'] == 'candles300s':
-                print('here')
-                # temporary save to text file for testing, data will be sent to datahandler module to be saved to database
-                with open('CoinFlexKlines.txt', 'a') as f:
-                    self.handler.add_kline_coinflex(data, data[0]['marketCode'])
-                    f.write(str(data))
-                    f.write(f'\n')
+                self.handler.add_kline_coinflex(data, data[0]['marketCode'])
             elif response['table'] == 'depthL10':
-                # temporary save to text file for testing, data will be sent to datahandler module to be saved to database
-                with open('CoinFlexBooks.txt', 'a') as f:
-                    f.write(str(data))
-                    f.write(f'\n')
+                self.handler.add_books_coinflex(data, data['marketCode'])
 
         def on_close(ws):
             print("closed connection")
@@ -72,19 +65,19 @@ class CoinFlexSocket():
             "args": []
         }
         for symbol in self.symbols:
-            req['args'].append("candles300s:" + symbol) 
+            req['args'].append("candles300s:" + symbol)
         self.websocket.send(json.dumps(req))
 
     def subscribe_to_orderbook_streams(self):
-       sleep(3)
-       req = {
+        sleep(3)
+        req = {
             "op": "subscribe",
             "tag": 103,
             "args": []
         }
-       for symbol in self.symbols:
-            req['args'].append("depthL10:" + symbol) 
-       self.websocket.send(json.dumps(req))
+        for symbol in self.symbols:
+            req['args'].append("depthL10:" + symbol)
+        self.websocket.send(json.dumps(req))
+
 
 test = CoinFlexSocket()
-

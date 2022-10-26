@@ -15,7 +15,6 @@ class BybitSocket():
         self.symbols = []
         self.handler = DatabaseHandler.DatabaseHandler()
         self.connect()
-        
 
     def close(self):
         if self.thread and self.thread.isAlive():
@@ -26,14 +25,14 @@ class BybitSocket():
         def on_message(ws, message):
             response = json.loads(message)
             data = response['data']
-            if 'type' in response: 
-                #temporary save to text file for testing, data will be sent to datahandler module to be saved to database        
+            if 'type' in response:
+                # temporary save to text file for testing, data will be sent to datahandler module to be saved to database
                 with open('bybitBooks.txt', 'a') as f:
                     f.write(str(data))
                     f.write(f'\n')
-            else: 
-                with open('bybitKlines.txt', 'a') as f:
-                    self.handler.add_kline_bybit(data,response['topic'].removeprefix('klineV2.15.'))
+            else:
+                self.handler.add_kline_bybit(
+                    data, response['topic'].removeprefix('klineV2.15.'))
 
         def on_close(ws):
             print("closed connection")
@@ -49,9 +48,10 @@ class BybitSocket():
         self.thread = Thread(target=self.websocket.run_forever)
         self.thread.start()
         self.get_instuments()
-    
-    def get_instuments(self): 
-        instrument_response = requests.get('https://api.bybit.com//v2/public/symbols').json()['result']
+
+    def get_instuments(self):
+        instrument_response = requests.get(
+            'https://api.bybit.com//v2/public/symbols').json()['result']
         self.symbols = list(map(lambda d: d['name'], instrument_response))
         self.subscribe_to_kline_streams()
         self.subscribe_to_orderbook_streams()
@@ -66,7 +66,7 @@ class BybitSocket():
         #     req['args'][0] = req['args'][0] + symbol + "|"
         # req['args'][0] = req['args'][0][:-1]
         self.websocket.send(json.dumps(req))
-    
+
     def subscribe_to_orderbook_streams(self):
         sleep(3)
         req = {
@@ -77,4 +77,6 @@ class BybitSocket():
         #     req['args'][0] = req['args'][0] + symbol + "|"
         # req['args'][0] = req['args'][0][:-1]
         self.websocket.send(json.dumps(req))
+
+
 test = BybitSocket()

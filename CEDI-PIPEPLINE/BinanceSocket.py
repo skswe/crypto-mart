@@ -73,9 +73,8 @@ class BinanceSocket():
     def clear_book_cache(self):
         Timer(300.0, self.clear_book_cache).start()
         with open('binanceBooks.txt', 'a') as f:
-            # Change the standard output to the file we created.
-            # Reset the standard output to its original value
             for data in self.book_data_cache:
+                self.handler.add_books_binance(data,data[0])
                 f.write(str(data))
                 f.write(f'\n')
         self.book_data_cache = []
@@ -130,11 +129,7 @@ class BinanceSocket():
                         # only store Klines whose event time and data end time are within 3 seconds of each other
                         timeDiff = float(response['E']) - float(data['T'])
                         if timeDiff >= 0 and timeDiff <= 3000:
-                            #temporary save to text file for testing, data will be sent to datahandler module to be saved to database
-                            with open('binanceKlines.txt', 'a') as f:
                                 self.handler.add_kline_binance(data, data['s'])
-                                f.write(str(data))
-                                f.write(f'\n')
                     elif response['e'] == 'depthUpdate':
                         #temporary save to text file for testing, data will be sent to datahandler module to be saved to database
                         if response['s'] not in self.book_symbols_cache:
