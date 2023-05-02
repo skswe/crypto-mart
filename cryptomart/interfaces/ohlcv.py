@@ -6,7 +6,7 @@ import numpy as np
 import pandas as pd
 from pyutil.cache import cached
 
-from ..enums import Instrument, Interval, OHLCVColumn, Symbol
+from ..enums import Instrument, Interval, OHLCVColumn
 from ..errors import MissingDataError, NotSupportedError
 from ..feeds import OHLCVFeed
 from ..interfaces.api import APIInterface
@@ -19,7 +19,7 @@ class OHLCVInterface(APIInterface):
 
     def __init__(
         self,
-        instruments: Dict[Symbol, str],
+        instruments: Dict[str, str],
         intervals: Dict[Interval, IntervalType],
         max_response_limit: Union[int, Callable[[datetime.timedelta], int]],
         valid_data_threshold: float = 1,
@@ -42,13 +42,13 @@ class OHLCVInterface(APIInterface):
 
     @cached(
         os.path.join(os.getenv("CM_CACHE_PATH", "/tmp/cache"), "ohlcv"),
-        is_method=True,
         instance_identifiers=["name"],
         instance_path_seperators=["exchange_name", "inst_type"],
+        name="ohlcv",
     )
     def run(
         self,
-        symbol: Symbol,
+        symbol: str,
         interval: Interval,
         starttime: TimeType,
         endtime: TimeType,
@@ -58,7 +58,7 @@ class OHLCVInterface(APIInterface):
         """Run main interface function
 
         Args:
-            symbol (Symbol): Symbol to query
+            symbol (str): Symbol to query
             interval (Interval): Interval or frequency of bars
             starttime (TimeType): Time of the first open
             endtime (TimeType): Time of the last close

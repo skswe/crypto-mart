@@ -3,7 +3,7 @@ from typing import Dict
 
 import pandas as pd
 
-from ..enums import OrderBookSchema, OrderBookSide, Symbol
+from ..enums import OrderBookSchema, OrderBookSide
 from ..errors import MissingDataError
 from ..interfaces.api import APIInterface
 
@@ -11,19 +11,19 @@ from ..interfaces.api import APIInterface
 class OrderBookInterface(APIInterface):
     def __init__(
         self,
-        instruments: Dict[Symbol, str],
-        multipliers: Dict[Symbol, float],
+        instruments: Dict[str, str],
+        multipliers: Dict[str, float],
         **api_interface_kwargs,
     ):
         super().__init__(**api_interface_kwargs)
         self.instruments = instruments
         self.multipliers = multipliers
 
-    def run(self, symbol: Symbol, depth: int, **cache_kwargs) -> pd.DataFrame:
+    def run(self, symbol: str, depth: int, **cache_kwargs) -> pd.DataFrame:
         """Run main interface function
 
         Args:
-            symbol (Symbol): Symbol to query
+            symbol (str): Symbol to query
             depth (int): Number of bids/asks to include in the snapshot
 
         Returns:

@@ -6,7 +6,7 @@ import numpy as np
 import pandas as pd
 from pyutil.cache import cached
 
-from ..enums import FundingRateSchema, Instrument, Symbol
+from ..enums import FundingRateSchema
 from ..errors import MissingDataError, NotSupportedError
 from ..feeds import FundingRateFeed
 from ..types import TimeType
@@ -19,7 +19,7 @@ class FundingRateInterface(APIInterface):
 
     def __init__(
         self,
-        instruments: Dict[Symbol, str],
+        instruments: Dict[str, str],
         max_response_limit: Union[int, Callable[[datetime.timedelta], int]],
         valid_data_threshold: float = 1,
         funding_interval: datetime.timedelta = datetime.timedelta(hours=8),
@@ -41,13 +41,13 @@ class FundingRateInterface(APIInterface):
 
     @cached(
         os.path.join(os.getenv("CM_CACHE_PATH", "/tmp/cache"), "funding_rate"),
-        is_method=True,
         instance_identifiers=["name"],
         instance_path_seperators=["exchange_name", "inst_type"],
+        name="funding_rate",
     )
     def run(
         self,
-        symbol: Symbol,
+        symbol: str,
         starttime: TimeType,
         endtime: TimeType,
         strict: bool,
@@ -56,7 +56,7 @@ class FundingRateInterface(APIInterface):
         """Run main interface function
 
         Args:
-            symbol (Symbol): Symbol to query
+            symbol (str): Symbol to query
             starttime (TimeType): Time of the first open
             endtime (TimeType): Time of the last close
             strict (bool): If `True`, raises an exception when missing data is above threshold

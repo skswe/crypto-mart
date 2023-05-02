@@ -8,7 +8,7 @@ import numpy as np
 import pandas as pd
 from pandas.core.internals import BlockManager
 
-from .enums import FundingRateSchema, InstrumentType, Interval, OHLCVColumn, Symbol
+from .enums import FundingRateSchema, InstrumentType, Interval, OHLCVColumn
 from .util import parse_time
 
 logger = logging.getLogger(__name__)
@@ -152,7 +152,7 @@ class OHLCVFeed(TSFeedBase):
         self,
         data=None,
         exchange_name: str = "",
-        symbol: Symbol = None,
+        symbol: str = None,
         inst_type: InstrumentType = None,
         interval: Interval = None,
         timedelta: datetime.timedelta = None,
@@ -165,7 +165,7 @@ class OHLCVFeed(TSFeedBase):
         Args:
             data (pd.DataFrame, optional): Underlying dataframe object to wrap.
             exchange_name (str, optional): Name of the exchange this data is from. Defaults to "".
-            symbol (Symbol, optional): Symbol for this data. Defaults to None.
+            symbol (str, optional): Symbol for this data. Defaults to None.
             inst_type (InstrumentType, optional): InstrumentType for this data. Defaults to None.
             interval (Interval, optional): Interval for this data. Defaults to None.
             timedelta (datetime.timedelta, optional): Timedelta for this data. Defaults to None.
@@ -294,7 +294,7 @@ class FundingRateFeed(TSFeedBase):
         self,
         data=None,
         exchange_name: str = "",
-        symbol: Symbol = None,
+        symbol: str = None,
         timedelta: datetime.timedelta = None,
         starttime: datetime.datetime = None,
         endtime: datetime.datetime = None,
@@ -305,7 +305,7 @@ class FundingRateFeed(TSFeedBase):
         Args:
             data (pd.DataFrame, optional): Underlying dataframe object to wrap.
             exchange_name (str, optional): Name of the exchange this data is from. Defaults to "".
-            symbol (Symbol, optional): Symbol for this data. Defaults to None.
+            symbol (str, optional): Symbol for this data. Defaults to None.
             timedelta (datetime.timedelta, optional): Timedelta for this data. Defaults to None.
             starttime (datetime.datetime, optional): Starttime for this data. Defaults to None.
             endtime (datetime.datetime, optional): Endtime for this data. Defaults to None.

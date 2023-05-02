@@ -8,7 +8,7 @@ from typing import Any, Dict, List, Union
 
 import pandas as pd
 
-from .enums import Exchange, InstrumentType, Interval, Symbol
+from .enums import Exchange, InstrumentType, Interval
 from .exchanges import FTX, Binance, BitMEX, Bybit, CoinFLEX, GateIO, Kucoin, OKEx
 from .exchanges.base import ExchangeAPIBase
 from .feeds import FundingRateFeed, OHLCVFeed
@@ -28,7 +28,7 @@ class Client:
         log_level: str = "INFO",
         log_file: str = None,
         quiet: bool = False,
-        refresh_instruments: bool = False,
+        instrument_cache_kwargs: dict = {"disabled": False, "refresh": False},
         **kwargs,
     ):
         """Unified interface to all registered Exchanges.
@@ -39,7 +39,6 @@ class Client:
             log_file (str, optional): file to save logs to. Defaults to None.
             exchange_init_kwargs: kwargs to pass to creation of each exchange object in `exchanges`
             quiet: If True, hides initialization logs.
-            refresh_instruments (bool): If True, refreshes the instrument cache
         """
         if quiet:
             # Disables all logs at INFO or below
@@ -66,7 +65,7 @@ class Client:
         self._active_exchanges = [getattr(Exchange, e) for e in exchanges]
         self._exchange_instance_map: Dict[Exchange, ExchangeAPIBase] = {}
         self._exchange_class_map = {}
-        self._load_exchanges(cache_kwargs=cache_kwargs, log_level=log_level, refresh_instruments=refresh_instruments)
+        self._load_exchanges(cache_kwargs=cache_kwargs, log_level=log_level, instrument_cache_kwargs=instrument_cache_kwargs)
         logger.info("Client initialized")
         logger.info("=" * 80)
 
@@ -76,16 +75,16 @@ class Client:
 
     def instrument_info(
         self, exchange: Exchange, inst_type: InstrumentType, map_column: str = None, cache_kwargs: dict = {}
-    ) -> Union[pd.DataFrame, Dict[Symbol, Any]]:
+    ) -> Union[pd.DataFrame, Dict[str, Any]]:
         """Get instrument info
 
         Args:
             exchange (Exchange): Registered exchange to call
             inst_type (InstrumentType): Type of instrument to retrieve info for.
-            map_column (str): If provided, returns a dict of Symbol -> map_column.
+            map_column (str): If provided, returns a dict of symbol -> map_column.
             cache_kwargs (dict): Optional cache control settings. See pyutil.cache.cached for details.
         Returns:
-            Union[pd.DataFrame, Dict[Symbol, Any]]: Instrument info
+            Union[pd.DataFrame, Dict[str, Any]]: Instrument info
         """
         return self._exchange_instance_map[exchange].instrument_info(
             inst_type, map_column=map_column, cache_kwargs=cache_kwargs
@@ -94,7 +93,7 @@ class Client:
     def ohlcv(
         self,
         exchange: Exchange,
-        symbol: Symbol,
+        symbol: str,
         inst_type: InstrumentType,
         starttime: TimeType,
         endtime: TimeType,
@@ -106,7 +105,7 @@ class Client:
 
         Args:
             exchange (Exchange): Registered exchange to call
-            symbol (Symbol): Symbol to query
+            symbol (str): Symbol to query
             inst_type (InstrumentType): Type of instrument to query
             interval (Interval): Interval or frequency of bars
             starttime (TimeType): Time of the first open
@@ -133,7 +132,7 @@ class Client:
     def funding_rate(
         self,
         exchange: Exchange,
-        symbol: Symbol,
+        symbol: str,
         starttime: TimeType,
         endtime: TimeType,
         strict: bool = False,
@@ -143,7 +142,7 @@ class Client:
 
         Args:
             exchange (Exchange): Registered exchange to call
-            symbol (Symbol): Symbol to query
+            symbol (str): Symbol to query
             starttime (TimeType): Time of the first open
             endtime (TimeType): Time of the last close
             strict (bool): If `True`, raises an exception when missing data is above threshold
@@ -159,13 +158,13 @@ class Client:
         )
 
     def order_book(
-        self, exchange: Exchange, symbol: Symbol, inst_type: InstrumentType, depth: int = 20, cache_kwargs: dict = {}
+        self, exchange: Exchange, symbol: str, inst_type: InstrumentType, depth: int = 20, cache_kwargs: dict = {}
     ):
         """Get orderbook snapshot
 
         Args:
             exchange (Exchange): Registered exchange to call
-            symbol (Symbol): Symbol to query
+            symbol (str): Symbol to query
             inst_type (InstrumentType): Type of instrument to query
             depth (int): Number of bids/asks to include in the snapshot
             cache_kwargs (dict): Optional cache control settings. See pyutil.cache.cached for details.

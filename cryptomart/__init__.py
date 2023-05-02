@@ -4,7 +4,7 @@ from dotenv import load_dotenv
 
 from . import client, enums, errors, exchanges, feeds, globals, interfaces, types, util
 from .client import Client
-from .enums import Exchange, InstrumentType, Interval, Symbol
+from .enums import Exchange, InstrumentType, Interval
 from .exchanges.base import ExchangeAPIBase
 from .feeds import OHLCVFeed
 from .globals import LOGGING_FORMATTER
