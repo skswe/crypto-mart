@@ -62,8 +62,6 @@ The following exchanges are currently supported by the cryptomart API:
 - binance
 - bitmex
 - bybit
-- coinflex
-- ftx
 - gateio
 - kucoin
 - okex
