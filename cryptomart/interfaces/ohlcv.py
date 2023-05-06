@@ -23,6 +23,7 @@ class OHLCVInterface(APIInterface):
         intervals: Dict[Interval, IntervalType],
         max_response_limit: Union[int, Callable[[datetime.timedelta], int]],
         valid_data_threshold: float = 1,
+        close_timestamp: bool = False,
         **api_interface_kwargs,
     ):
         """Initialize the interface
@@ -39,6 +40,7 @@ class OHLCVInterface(APIInterface):
         self.intervals = intervals
         self.max_response_limit = max_response_limit
         self.valid_data_threshold = valid_data_threshold
+        self.close_timestamp = close_timestamp
 
     @cached(
         os.path.join(os.getenv("CM_CACHE_PATH", "/tmp/cache"), "ohlcv"),
@@ -72,6 +74,8 @@ class OHLCVInterface(APIInterface):
         """
         starttime = parse_time(starttime)
         endtime = parse_time(endtime)
+        if self.close_timestamp:
+            starttime = starttime - self.intervals[interval][1]
         assert endtime > starttime, "Invalid times"
 
         try:
@@ -114,13 +118,22 @@ class OHLCVInterface(APIInterface):
 
         # Fill missing rows / remove extra rows
         # remove the last index since we only care about open_time
-        expected_index = pd.date_range(starttime, endtime, freq=timedelta)[:-1]
+        if not self.close_timestamp:
+            expected_index = pd.date_range(starttime, endtime, freq=timedelta)[:-1]
+        else:
+            expected_index = pd.date_range(starttime, endtime, freq=timedelta)
 
         # Drop duplicate open_time axis
         data = data.groupby(OHLCVColumn.open_time).first()
 
         # Forces index to [starttime, endtime], adding nulls where necessary
         data = data.reindex(expected_index).reset_index().rename(columns={"index": OHLCVColumn.open_time})
+
+        if self.close_timestamp:
+            data[np.setdiff1d(data.columns, OHLCVColumn.open_time)] = data[
+                np.setdiff1d(data.columns, OHLCVColumn.open_time)
+            ].shift(-1)
+            data = data[1:-1]
 
         # Convert columns to float
         data[np.setdiff1d(data.columns, OHLCVColumn.open_time)] = data[
