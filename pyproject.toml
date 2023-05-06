@@ -21,7 +21,7 @@ dependencies = [
   "requests",
   "pandas",
   "numpy",
-  "pyutil @ git+ssh://git@github.com/senderr/pyutil.git"
+  "py-util @ git+ssh://git@github.com/senderr/pyutil.git"
 ]
 
 [project.urls]
