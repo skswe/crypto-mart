@@ -86,6 +86,7 @@ def ohlcv_perp(
                 [data, OHLCVInterface.extract_response_data(response, [], [], None, ["message"], col_map)],
                 ignore_index=True,
             )
+            data = data[data != '']
         except MissingDataError:
             continue
     return data
@@ -266,7 +267,7 @@ class GateIO(ExchangeAPIBase):
         perpetual = OHLCVInterface(
             instruments=self.perpetual_instruments,
             intervals=self.intervals,
-            max_response_limit=2000,
+            max_response_limit=1500,
             exchange=self,
             interface_name=Interface.OHLCV,
             inst_type=InstrumentType.PERPETUAL,
