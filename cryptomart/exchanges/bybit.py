@@ -155,42 +155,39 @@ def funding_rate(
     limits: List[int],
 ):
     col_map = {
-        "time": FundingRateSchema.timestamp,
-        "value": FundingRateSchema.funding_rate,
+        "fundingRateTimestamp": FundingRateSchema.timestamp,
+        "fundingRate": FundingRateSchema.funding_rate,
     }
-
-    # ByBit has no limit
-    starttime = starttimes[0]
-    endtime = endtimes[0]
-
-    def make_request(page):
-        params = {
-            "page": page,
-            "symbol": instrument_id,
-            "date": f"{starttime.strftime('%Y-%m-%d')} ~ {endtime.strftime('%Y-%m-%d')}",
-        }
-        return FundingRateInterface.extract_response_data(
-            dispatcher.send_request(Request("GET", url, params=params)),
-            ["result"],
-            ["ret_code"],
-            0,
-            ["ret_msg"],
-            raw=True,
+    reqs = []
+    for starttime, endtime, limit in zip(starttimes, endtimes, limits):
+        req = Request(
+            "GET",
+            url,
+            params={
+                "category": "linear",
+                "symbol": instrument_id,
+                "limit": limit,
+                "startTime": dt_to_timestamp(starttime, granularity="milliseconds"),
+                "endTime": dt_to_timestamp(endtime, granularity="milliseconds"),
+            },
         )
+        reqs.append(req)
 
-    first_res = make_request(1)
-    if len(first_res["data"]) == 0:
-        return pd.DataFrame()
-    current_page = 1
-    last_page = first_res["last_page"]
-    data = pd.DataFrame(first_res["data"]).rename(columns=col_map)[col_map.values()]
-    while current_page < last_page:
-        next_res = make_request(current_page + 1)
-        current_page += 1
-
-        data = pd.concat(
-            [data, pd.DataFrame(next_res["data"]).rename(columns=col_map)[col_map.values()]], ignore_index=True
-        )
+    responses = dispatcher.send_requests(reqs)
+    data = pd.DataFrame()
+    for response in responses:
+        try:
+            data = pd.concat(
+                [
+                    data,
+                    FundingRateInterface.extract_response_data(
+                        response, ["result", "list"], ["retCode"], 0, ["retMsg"], col_map
+                    ),
+                ],
+                ignore_index=True,
+            )
+        except MissingDataError:
+            continue
     return data
 
 
@@ -339,11 +336,11 @@ class Bybit(ExchangeAPIBase):
     def init_funding_rate_interface(self):
         perpetual = FundingRateInterface(
             instruments=self.perpetual_instruments,
-            max_response_limit=5000,
+            max_response_limit=200,
             exchange=self,
             interface_name=Interface.FUNDING_RATE,
             inst_type=InstrumentType.PERPETUAL,
-            url="https://api2.bybit.com/linear/funding-rate/list",
+            url=os.path.join(self.base_url, "v5/market/funding/history"),
             dispatcher=self.dispatcher,
             execute=funding_rate,
         )
