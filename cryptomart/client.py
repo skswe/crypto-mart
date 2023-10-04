@@ -9,7 +9,7 @@ from typing import Any, Dict, List, Union
 import pandas as pd
 
 from .enums import Exchange, InstrumentType, Interval
-from .exchanges import FTX, Binance, BitMEX, Bybit, CoinFLEX, GateIO, Kucoin, OKEx
+from .exchanges import Binance, BitMEX, Bybit, GateIO, Kucoin, OKEx
 from .exchanges.base import ExchangeAPIBase
 from .feeds import FundingRateFeed, OHLCVFeed
 from .globals import LOGGING_FORMATTER
@@ -187,14 +187,6 @@ class Client:
     @property
     def bybit(self) -> Bybit:
         return self._exchange_instance_map[Exchange.BYBIT]
-
-    @property
-    def coinflex(self) -> CoinFLEX:
-        return self._exchange_instance_map[Exchange.COINFLEX]
-
-    @property
-    def ftx(self) -> FTX:
-        return self._exchange_instance_map[Exchange.FTX]
 
     @property
     def okex(self) -> OKEx:

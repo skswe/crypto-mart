@@ -58,8 +58,6 @@ class Exchange(NameEnum):
     BINANCE = "binance"
     BITMEX = "bitmex"
     BYBIT = "bybit"
-    COINFLEX = "coinflex"
-    FTX = "ftx"
     OKEX = "okex"
     GATEIO = "gateio"
     KUCOIN = "kucoin"
