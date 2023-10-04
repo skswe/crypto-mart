@@ -4,14 +4,13 @@ from typing import Callable, Dict, Union
 
 import numpy as np
 import pandas as pd
-from pyutil.cache import cached
 
-from ..enums import Instrument, Interval, OHLCVColumn
+from ..enums import Interval, OHLCVColumn
 from ..errors import MissingDataError, NotSupportedError
 from ..feeds import OHLCVFeed
 from ..interfaces.api import APIInterface
 from ..types import IntervalType, TimeType
-from ..util import get_request_intervals, parse_time
+from ..util import cached, get_request_intervals, parse_time
 
 
 class OHLCVInterface(APIInterface):

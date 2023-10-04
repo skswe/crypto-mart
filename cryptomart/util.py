@@ -1,6 +1,11 @@
 import datetime
+import functools
+import hashlib
+import inspect
 import logging
 import math
+import os
+import pickle
 import threading
 import time
 from queue import Queue
@@ -10,6 +15,8 @@ import pandas as pd
 import requests
 
 from .types import JSONDataType, TimeType
+
+logger = logging.getLogger(__name__)
 
 
 def int_to_dt(time: int) -> datetime.datetime:
@@ -244,3 +251,253 @@ class Dispatcher:
             result = self.dispatch_fn(request)
             self.result_queue.put(result)
             self.pending_queue.task_done()
+
+
+class cached:
+    @classmethod
+    def _sort_dict(cls, d, reverse=False) -> dict:
+        """Sort a dict based on keys recursively"""
+        new_d = {}
+        sorted_keys = sorted(d, reverse=reverse)
+        for key in sorted_keys:
+            if isinstance(d[key], dict):
+                new_d[key] = cls._sort_dict(d[key])
+            else:
+                new_d[key] = d[key]
+        return new_d
+
+    @classmethod
+    def _hash_dict(cls, d: dict) -> str:
+        """Hash dict in order-agnostic manner by ordering keys and hashes of values"""
+
+        # order keys and hash result
+        key_hash = cls._hash_item(list(sorted(d.keys())))
+
+        # hash_item will call this function recursively if dict is passed
+        values = [cls._hash_item(i) for i in d.values()]
+
+        return cls._hash_item([key_hash, sorted(values)])
+
+    @classmethod
+    def _hash_item(cls, i):
+        """Hash a python object by pickling and then applying MD5 to resulting bytes"""
+        if isinstance(i, dict):
+            return cls._hash_dict(i)
+        try:
+            hash = hashlib.md5(pickle.dumps(i)).hexdigest()
+        except TypeError:
+            logger.warning(f"Unable to hash {i}, using hash of the object's class instead")
+            hash = hashlib.md5(pickle.dumps(i.__class__)).hexdigest()
+        except AttributeError:
+            logger.warning(f"Unable to hash the objects class, using hash of class name instead")
+            hash = hashlib.md5(pickle.dumps(i.__class__.__name__)).hexdigest()
+        return hash
+
+    @classmethod
+    def log(cls, level, *msg):
+        logger.log(logging._nameToLevel[level], *msg)
+
+    @staticmethod
+    def search(path, key):
+        if not os.path.exists(path):
+            os.makedirs(path, exist_ok=True)
+        return True if key in os.listdir(path) else False
+
+    def __init__(
+        self,
+        path: str = "/tmp/cache",
+        disabled: bool = False,
+        refresh: bool = False,
+        log_level: str = "INFO",
+        identifiers: list = [],
+        path_seperators: list = [],
+        instance_identifiers: list = [],
+        instance_path_seperators: list = [],
+        load_fn=pd.read_pickle,
+        save_fn=pd.to_pickle,
+        search_fn=None,
+        propagate_kwargs: bool = False,
+        name: str = None,
+    ):
+        """Save the result of the decorated function in a cache. Function arguments are hashed such that subsequent
+        calls with the same arguments result in a cache hit
+
+        Args:
+            path: disk path to store cached objects. Defaults to "cache".
+            disabled: whether or not to bypass the cache for the function call. Defaults to False.
+            refresh: whether or not to bypass cache lookup to force a new cache write. Defaults to False.
+            log_level: level to emit logs at. defaults to INFO
+            identifiers: additional arguments that are hashed to identify a unique function call. Defaults to [].
+            path_seperators: list of argument names to use as path seperators after `path`
+            instance_identifiers: name of instance attributes to include in `identifiers` if `is_method` is `True`. Defaults to [].
+            instance_path_seperators: name of instance attributes to include in `path_seperators` if `is_method` is `True`. Defaults to [].
+            load_fn: Function to load cached data. Defaults to pd.read_pickle.
+            save_fn: Function to save cached data. Defaults to pd.to_pickle.
+            search_fn: Function ((path, key) -> bool) to override default search function. Defaults to os.listdir.
+            propagate_kwargs: whether or not to propagate keyword arguments to the decorated function. Defaults to False.
+            name: name of function or operation being cached. Defaults to None.
+        """
+        self.params = {
+            "path": path,
+            "disabled": disabled,
+            "refresh": refresh,
+            "log_level": log_level,
+            "identifiers": identifiers.copy(),
+            "path_seperators": path_seperators.copy(),
+            "instance_identifiers": instance_identifiers.copy(),
+            "instance_path_seperators": instance_path_seperators.copy(),
+            "load_fn": load_fn,
+            "save_fn": save_fn,
+            "search_fn": search_fn or self.search,
+            "propagate_kwargs": propagate_kwargs,
+            "name": name,
+        }
+
+    def __call__(self, func):
+        self.params["name"] = self.params["name"] or func.__name__
+
+        @functools.wraps(func)
+        def wrapper(*args, **kwargs):
+            all_args = self._sort_dict(inspect.getcallargs(func, *args, **kwargs))
+
+            # Update params using override passed in through calling function
+            params = self.get_cache_params(kwargs)
+            return self.perf_cache_lookup(func, params, all_args, *args, **kwargs)
+
+        return wrapper
+
+    def get_cache_params(self, kwargs):
+        params = {}
+        for k, v in self.params.items():
+            if isinstance(v, list) or isinstance(v, dict):
+                params[k] = v.copy()
+            else:
+                params[k] = v
+
+        if "cache_kwargs" in kwargs:
+            # Support special cache_kwargs parameter in case calling function has a name clash with cache params
+            params.update(kwargs["cache_kwargs"])
+            if not params["propagate_kwargs"]:
+                del kwargs["cache_kwargs"]
+
+        else:
+            # Since cache_kwargs was not provided, check for overrides directly in kwargs.
+            # Note that params get deleted from kwargs so cache_kwargs should be used in case of
+            # name conflicts
+            params.update(kwargs)
+
+            if not params["propagate_kwargs"]:
+                for key in params.keys():
+                    try:
+                        # Delete override from function kwargs before passing to query
+                        del kwargs[key]
+                    except KeyError:
+                        pass
+        return params
+
+    @classmethod
+    def perf_cache_lookup(cls, func, params, all_args, *args, **kwargs):
+        path = params["path"]
+        disabled = params["disabled"]
+        refresh = params["refresh"]
+        log_level = params["log_level"]
+        identifiers = params["identifiers"]
+        path_seperators = params["path_seperators"]
+        instance_identifiers = params["instance_identifiers"]
+        instance_path_seperators = params["instance_path_seperators"]
+        load_fn = params["load_fn"]
+        save_fn = params["save_fn"]
+        search_fn = params["search_fn"]
+        name = params["name"]
+
+        # Short circuit if disabled
+        if disabled:
+            return func(*args, **kwargs)
+
+        # Parse identifiers and path seperators
+        path_seperators = [all_args[ps] for ps in path_seperators]
+        if "self" in all_args:
+            instance = all_args["self"]
+            identifiers.extend([getattr(instance, id) for id in instance_identifiers])
+            path_seperators.extend([getattr(instance, ps) for ps in instance_path_seperators])
+
+        # Add path seperators
+        path = os.path.join(path, *path_seperators)
+
+        # Hash arguments
+        hashable = {k: v for k, v in all_args.items() if k not in params and k not in ["cache_kwargs", "self"]}
+        key = cls._hash_item([cls._hash_item(i) for i in [hashable, sorted(identifiers)]])
+
+        # Logs will show identifiers and hashable arguments in the function call
+        argument_string = (*(f"(id:{i})" for i in identifiers), *(f"{k}={v}" for k, v in hashable.items()))
+        argument_string = f"({', '.join(str(arg) for arg in argument_string)})"
+
+        # Cache lookup
+        if not refresh and search_fn(path, key) is True:
+            cls.log(log_level, f"Using cached value in call to {name}{argument_string} | key={key} ({path})")
+            return load_fn(os.path.join(path, key))
+        else:
+            data = func(*args, **kwargs)
+            cls.log(log_level, f"Saving cached value in call to {name}{argument_string} | key={key} ({path})")
+            save_fn(data, os.path.join(path, key))
+            return data
+
+
+# Forward Definition
+class NameEnum:
+    ...
+
+
+class RemovedAttribute:
+    def __get__(self, instance, owner):
+        raise AttributeError
+
+
+class NameEnumMeta(type):
+    def __len__(self):
+        return len(set(self._values()))
+
+    def __iter__(self):
+        return set(self._values()).__iter__()
+
+    def __delattr__(self, __name: str) -> None:
+        if hasattr(self, __name) and __name in self.__fields__:
+            del self.__fields__[__name]
+            setattr(self, __name, RemovedAttribute())
+        else:
+            super().__delattr__(__name)
+
+    def __init__(self, name, bases, dict):
+        if len(bases) > 0 and issubclass(bases[0], NameEnum) and bases[0].__name__ != "NameEnum":
+            parent_fields = bases[0].__fields__
+            for k, v in parent_fields.items():
+                setattr(self, k, v)
+        else:
+            parent_fields = {}
+
+        self.__reserved_fields__ = ["_names", "_values", "_reverse_lookup"]
+        self.__fields__ = parent_fields
+        for k in dict.keys():
+            if not k.startswith("__") and k not in self.__reserved_fields__:
+                self.__fields__[k] = dict[k]
+
+        super().__init__(name, bases, dict)
+
+
+class NameEnum(str, metaclass=NameEnumMeta):
+    """Base class for simple plain class string enums"""
+
+    @classmethod
+    def _names(cls):
+        return list(cls.__fields__.keys())
+
+    @classmethod
+    def _values(cls):
+        return list(set(cls.__fields__.values()))
+
+    @classmethod
+    def _reverse_lookup(cls, value):
+        for k, v in cls.__fields__.items():
+            if v == value:
+                return k
+        raise ValueError(f"{value} not in {cls.__name__}")

@@ -3,13 +3,12 @@ from typing import Dict, Union
 
 import numpy as np
 import pandas as pd
-from pyutil.cache import cached
 
 from ..enums import Instrument
 from ..errors import MissingDataError
 from ..globals import SYMBOL_ALIASES
 from ..interfaces.api import APIInterface
-from ..util import parse_time
+from ..util import cached, parse_time
 
 
 class InstrumentInfoInterface(APIInterface):
