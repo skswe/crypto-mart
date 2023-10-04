@@ -4,13 +4,12 @@ from typing import Callable, Dict, Union
 
 import numpy as np
 import pandas as pd
-from pyutil.cache import cached
 
 from ..enums import FundingRateSchema
 from ..errors import MissingDataError, NotSupportedError
 from ..feeds import FundingRateFeed
 from ..types import TimeType
-from ..util import get_request_intervals, parse_time
+from ..util import cached, get_request_intervals, parse_time
 from .api import APIInterface
 
 

@@ -48,7 +48,6 @@ class Client:
         logger.info("Initializing client... (To hide initialization logs, pass quiet=True)")
         self._cache_kwargs = cache_kwargs
         logging.getLogger("cryptomart").setLevel(log_level)
-        logging.getLogger("pyutil").setLevel(log_level)
 
         if log_file is not None:
             if os.path.exists(log_file):
@@ -65,7 +64,9 @@ class Client:
         self._active_exchanges = [getattr(Exchange, e) for e in exchanges]
         self._exchange_instance_map: Dict[Exchange, ExchangeAPIBase] = {}
         self._exchange_class_map = {}
-        self._load_exchanges(cache_kwargs=cache_kwargs, log_level=log_level, instrument_cache_kwargs=instrument_cache_kwargs)
+        self._load_exchanges(
+            cache_kwargs=cache_kwargs, log_level=log_level, instrument_cache_kwargs=instrument_cache_kwargs
+        )
         logger.info("Client initialized")
         logger.info("=" * 80)
 
@@ -82,7 +83,7 @@ class Client:
             exchange (Exchange): Registered exchange to call
             inst_type (InstrumentType): Type of instrument to retrieve info for.
             map_column (str): If provided, returns a dict of symbol -> map_column.
-            cache_kwargs (dict): Optional cache control settings. See pyutil.cache.cached for details.
+            cache_kwargs (dict): Optional cache control settings.
         Returns:
             Union[pd.DataFrame, Dict[str, Any]]: Instrument info
         """
@@ -111,7 +112,7 @@ class Client:
             starttime (TimeType): Time of the first open
             endtime (TimeType): Time of the last close
             strict (bool): If `True`, raises an exception when missing data is above threshold
-            cache_kwargs (dict): Optional cache control settings. See pyutil.cache.cached for details.
+            cache_kwargs (dict): Optional cache control settings.
         Raises:
             NotSupportedError: If the given symbol, interval are not supported by the API
             MissingDataError: If data does not meet self.valid_data_threshold and `strict=True`.
@@ -167,7 +168,7 @@ class Client:
             symbol (str): Symbol to query
             inst_type (InstrumentType): Type of instrument to query
             depth (int): Number of bids/asks to include in the snapshot
-            cache_kwargs (dict): Optional cache control settings. See pyutil.cache.cached for details.
+            cache_kwargs (dict): Optional cache control settings.
 
         Returns:
             pd.DataFrame: Orderbook
@@ -229,7 +230,6 @@ class Client:
     @log_level.setter
     def log_level(self, level):
         logging.getLogger("cryptomart").setLevel(level)
-        logging.getLogger("pyutil").setLevel(level)
         for exch in self._exchange_instance_map.values():
             exch.log_level = level
 

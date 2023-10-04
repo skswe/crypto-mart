@@ -1,4 +1,4 @@
-from pyutil.enums import NameEnum
+from .util import NameEnum
 
 
 class Instrument(NameEnum):

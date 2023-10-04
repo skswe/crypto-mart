@@ -7,7 +7,7 @@ markers = ["requires_http"]
 
 [project]
 name = "crypto-mart"
-version = "2.0.13"
+version = "2.1.0"
 readme = "README.md"
 license = {file = "LICENSE"}
 authors = [
@@ -15,17 +15,16 @@ authors = [
   {name = "Stefano Katsoras"}
 ]
 maintainers = [
-  {name = "Stefano Katsoras", email = "stefano.katsoras@gmail.com"}
+  {name = "Stefano", email = "sk.swe@outlook.com"}
 ]
 dependencies = [
   "requests",
   "pandas",
   "numpy",
-  "py-util @ git+ssh://git@github.com/senderr/pyutil.git"
 ]
 
 [project.urls]
-repository = "https://github.com/senderr/crypto-mart"
+repository = "https://github.com/skswe/crypto-mart"
 
 [tool.setuptools]
 packages = ["cryptomart"]

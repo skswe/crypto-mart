@@ -22,7 +22,7 @@ class ExchangeAPIBase(ABC):
         """Init the exchange
 
         Args:
-            cache_kwargs (dict, optional): Cache control settings. See pyutil.cache.cached for details. Defaults to {"disabled": False, "refresh": False}.
+            cache_kwargs (dict, optional): Cache control settings. Defaults to {"disabled": False, "refresh": False}.
         """
         self.interfaces = {}
         self.logger = logging.getLogger(f"cryptomart.{self.name}")
@@ -64,7 +64,7 @@ class ExchangeAPIBase(ABC):
         Args:
             inst_type (InstrumentType): Type of instrument to retrieve info for.
             map_column (str): If provided, returns a dict of symbol -> map_column.
-            cache_kwargs (dict): Optional cache control settings. See pyutil.cache.cached for details.
+            cache_kwargs (dict): Optional cache control settings.
         Returns:
             Union[pd.DataFrame, Dict[str, Any]]: Instrument info
         """
@@ -92,7 +92,7 @@ class ExchangeAPIBase(ABC):
             starttime (TimeType): Time of the first open
             endtime (TimeType): Time of the last close
             strict (bool): If `True`, raises an exception when missing data is above threshold
-            cache_kwargs (dict): Optional cache control settings. See pyutil.cache.cached for details.
+            cache_kwargs (dict): Optional cache control settings.
         Raises:
             NotSupportedError: If the given symbol, interval are not supported by the API
             MissingDataError: If data does not meet self.valid_data_threshold and `strict=True`.
@@ -142,7 +142,7 @@ class ExchangeAPIBase(ABC):
             symbol (str): Symbol to query
             inst_type (InstrumentType): Type of instrument to query
             depth (int): Number of bids/asks to include in the snapshot
-            cache_kwargs (dict): Optional cache control settings. See pyutil.cache.cached for details.
+            cache_kwargs (dict): Optional cache control settings.
 
         Returns:
             pd.DataFrame: Orderbook
