@@ -358,8 +358,10 @@ class cached:
 
         @functools.wraps(func)
         def wrapper(*args, **kwargs):
-            all_args = self._sort_dict(inspect.getcallargs(func, *args, **kwargs))
+            if os.getenv("PYUTIL_DISABLE_CACHE"):
+                return func(*args, **kwargs)
 
+            all_args = self._sort_dict(inspect.getcallargs(func, *args, **kwargs))
             # Update params using override passed in through calling function
             params = self.get_cache_params(kwargs)
             return self.perf_cache_lookup(func, params, all_args, *args, **kwargs)
@@ -426,7 +428,8 @@ class cached:
 
         # Hash arguments
         hashable = {k: v for k, v in all_args.items() if k not in params and k not in ["cache_kwargs", "self"]}
-        key = cls._hash_item([cls._hash_item(i) for i in [hashable, sorted(identifiers)]])
+        identifiers_hashed = [cls._hash_item(id) for id in identifiers]
+        key = cls._hash_item([cls._hash_item(i) for i in [hashable, sorted(identifiers_hashed)]])
 
         # Logs will show identifiers and hashable arguments in the function call
         argument_string = (*(f"(id:{i})" for i in identifiers), *(f"{k}={v}" for k, v in hashable.items()))
@@ -434,18 +437,21 @@ class cached:
 
         # Cache lookup
         if not refresh and search_fn(path, key) is True:
-            cls.log(log_level, f"Using cached value in call to {name}{argument_string} | key={key} ({path})")
+            cls.log(
+                log_level, f"Using cached value in call to {name}{argument_string} | key={key} ({path})"[:200] + "..."
+            )
             return load_fn(os.path.join(path, key))
         else:
             data = func(*args, **kwargs)
-            cls.log(log_level, f"Saving cached value in call to {name}{argument_string} | key={key} ({path})")
+            cls.log(
+                log_level, f"Saving cached value in call to {name}{argument_string} | key={key} ({path})"[:200] + "..."
+            )
             save_fn(data, os.path.join(path, key))
             return data
 
 
 # Forward Definition
-class NameEnum:
-    ...
+class NameEnum: ...
 
 
 class RemovedAttribute:
