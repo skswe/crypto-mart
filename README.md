@@ -13,7 +13,7 @@ following types of data:
 
 ## Installation
 
-`pip install git+ssh://git@github.com/senderr/crypto-mart.git`
+`git clone git@github.com:skswe/crypto-mart.git`
 
 # A note on caching
 
