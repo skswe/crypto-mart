@@ -39,9 +39,6 @@ also be overridden globally by setting the environment variable:
 `export CM_CACHE_PATH=/new/path/` in bash or
 `os.environ["CM_CACHE_PATH"] = "/new/path/"` in python
 
-For more details on how to use / customize caching, see:
-https://github.com/senderr/pyutil/blob/master/pyutil/cache.py
-
 # Using the API
 
 Create a `Client` object which contains the main interface for this module
