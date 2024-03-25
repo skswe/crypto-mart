@@ -4,31 +4,3 @@ line-length = 119
 [tool.pytest.ini_options]
 log_cli = false
 markers = ["requires_http"]
-
-[project]
-name = "crypto-mart"
-version = "2.1.0"
-readme = "README.md"
-license = {file = "LICENSE"}
-authors = [
-  {email = "stefano.katsoras@gmail.com"},
-  {name = "Stefano Katsoras"}
-]
-maintainers = [
-  {name = "Stefano", email = "sk.swe@outlook.com"}
-]
-dependencies = [
-  "requests",
-  "pandas",
-  "numpy",
-]
-
-[project.urls]
-repository = "https://github.com/skswe/crypto-mart"
-
-[tool.setuptools]
-packages = ["cryptomart"]
-
-[build-system]
-requires = ["setuptools"]
-build-backend = "setuptools.build_meta"
